@@ -7,7 +7,7 @@ services:
   - type: web
     name: mono-back-office-dashboard
     runtime: docker
-    repo: https://github.com/Savrust11/MONO-Mart
+    repo: https://github.com/kelicku/monomart
     branch: main
     rootDir: dashboard
     dockerfilePath: ./Dockerfile
