@@ -1,0 +1,130 @@
+==============================================================================
+ファーストセラー 取得実績 (2026年第21週)
+==============================================================================
+
+対象期間: 2026/05/18 (月) ～ 2026/05/24 (日)
+ISO週番号: 2026-W21
+取得日時: 2026/05/26 23:24 JST (テスト実行)
+取得元: ZOZO BO ファーストセラー画面 (siteinfo.asp?c=Seller)
+取得方式: ヘッドレスブラウザでフォーム送信→画面表示テーブルをスクレイピング
+
+取得行数: 100行 (MEN 50位 + WOMEN 50位)
+
+━━━ MEN TOP 50 (売上順) ━━━
+  期間合計売上 : ¥    161,617,649
+  期間合計販売数:          48,633 点
+  最高売上     : ¥     12,187,800
+  最低売上     : ¥      1,441,600
+
+  順位｜ ショップ      ｜ 親カテ            ｜ ブランド品番 ｜ 商品名 (40文字)                          ｜ 売価     ｜ 販売数 ｜ 売上
+  ────┼───────────────┼──────────────────┼─────────────┼──────────────────────────────────────────┼──────────┼────────┼──────────────
+    1位│ MONO-MART     │ WYM LIDNM        │ WYpt1240    │ VINTAGE WASHED CURVED DENIM              │   ¥5,400 │   2257 │   ¥12,187,800
+    2位│ EMMA CLOTHES  │ CLEL             │ CLEpt1509   │ 【CLEL】Prime TR Semi-wide Tuck Slacks / プ │   ¥4,500 │   1651 │    ¥7,429,500
+    3位│ MONO-MART     │ WYM LIDNM        │ WYsc1529    │ REFINED RIB STRETCH HENLEY TEE           │   ¥2,700 │   2705 │    ¥7,303,500
+    4位│ MONO-MART     │ WYM LIDNM        │ WYsh1763    │ GAUZE JACQUARD CHECK H/S SHIRT           │   ¥4,500 │   1514 │    ¥6,813,000
+    5位│ MONO-MART     │ WYM LIDNM        │ WYbg840     │ FAUX SUEDE SHOULDER BAG                  │   ¥5,400 │   1010 │    ¥5,454,000
+    6位│ MONO-MART     │ WYM LIDNM        │ WYsd205     │ MESH STRAP SNEAKER SANDALS               │   ¥9,000 │    598 │    ¥5,382,000
+    7位│ MONO-MART     │ WYM LIDNM        │ WYpt1794    │ HIGH COUNT COTTON CURVED SLACKS          │   ¥6,000 │    853 │    ¥5,118,000
+    8位│ EMMA CLOTHES  │ CLEL             │ CLEsh1730   │ 【CLEL】Basic/Floral Pattern Sheer Shirt / │   ¥5,000 │   1007 │    ¥5,035,000
+    9位│ EMMA CLOTHES  │ EMMA CLOTHES     │ EMpt734     │ TRストレッチスーツ地 ストレート 1タック センタープレス ワイドパンツ/スラ │   ¥4,300 │   1160 │    ¥4,988,000
+   10位│ EMMA CLOTHES  │ CLEL             │ CLEsh865    │ 【CLEL】TR Loose Half Sleeve Regular Colla │   ¥3,600 │   1352 │    ¥4,867,200
+   11位│ MONO-MART     │ MONO-MART        │ sc048       │ carhartt/カーハート Workwear ビッグシルエット ポケット半袖  │   ¥3,600 │   1293 │    ¥4,654,800
+   12位│ MONO-MART     │ MONO-MART        │ sc260       │ U.S. POLO ASSN. /ユーエスポロアッスン 別注ワンポイント刺繍 ビ │   ¥2,610 │   1704 │    ¥4,447,440
+   13位│ EMMA CLOTHES  │ CLEL             │ CLEpa705    │ 【CLEL】Watermark Knitting Mesh Zip Parka/ │   ¥5,000 │    878 │    ¥4,390,000
+   14位│ MONO-MART     │ MONO-MART        │ sc491       │ リラックスルーズベーシックT オーバーサイズ ラスティックコットンカットソー   │   ¥1,620 │   2241 │    ¥3,630,420
+   15位│ MONO-MART     │ MONO-MART        │ hc991       │ Champion Authentic T-SHIRTS/ チャンピオン コットン │   ¥1,400 │   2522 │    ¥3,530,800
+   16位│ EMMA CLOTHES  │ Parts Lab.       │ PARpt1775   │ 【Parts Lab.】Basic Water Repellent Nylon  │   ¥5,400 │    626 │    ¥3,380,400
+   17位│ MONO-MART     │ MONO-MART        │ sc1444      │ KANGOL/カンゴール 別注 ワンポイントロゴ刺繍 スプレー加工 グラデーショ │   ¥3,120 │   1023 │    ¥3,191,760
+   18位│ MONO-MART     │ MONO-MART        │ sc737       │ ツアーグラフィックデザイン ルーズ半袖Tシャツ                  │   ¥1,800 │   1727 │    ¥3,108,600
+   19位│ MONO-MART     │ THE CRAFT CREW P │ sc351       │ 【THE NORTH FACE / ザ・ノースフェイス】半袖 Tシャツ DAIL │   ¥5,394 │    568 │    ¥3,063,792
+   20位│ EMMA CLOTHES  │ cussil           │ CUSsh1098   │ 【cussil/クシル】TRストレッチルーズシルエット2wayオープンカラーシャ │   ¥3,600 │    850 │    ¥3,060,000
+   21位│ ADRER         │ ADRER            │ ADRsc1298   │ ESSENTIAL HEAVY COTTON PIGMENT TEE / エッセ │     ¥900 │   3135 │    ¥2,821,500
+   22位│ MONO-MART     │ WYM LIDNM        │ WYac100     │ LEATHER WESTERN BELT                     │   ¥3,600 │    742 │    ¥2,671,200
+   23位│ MONO-MART     │ WYM LIDNM        │ WYpt1406    │ SLIGHT FLARE DOUBLE CLOTH BAGGY SLACKS   │   ¥5,400 │    475 │    ¥2,565,000
+   24位│ MONO-MART     │ WYM LIDNM        │ lc641       │ COOL DRY DENSE TEE -STANDARD FIT-        │   ¥2,200 │   1165 │    ¥2,563,000
+   25位│ MONO-MART     │ WYM LIDNM        │ WYlo009     │ GENUINE LEATHER PLAIN DERBY SHOES        │   ¥9,000 │    284 │    ¥2,556,000
+   26位│ EMMA CLOTHES  │ CLEL             │ CLEpt1013   │ 【CLEL】Vintage Design Flare Denim Pants / │   ¥3,600 │    678 │    ¥2,440,800
+   27位│ EMMA CLOTHES  │ Parts Lab.       │ PARsc1512   │ 【Parts Lab.】Lab Gear Cool Functional Inn │   ¥1,345 │   1749 │    ¥2,352,405
+   28位│ ADRER         │ ADRER            │ ADRpt1312   │ vintage make wide tapered denim / ヴィンテージ │   ¥4,500 │    509 │    ¥2,290,500
+   29位│ MONO-MART     │ THE CRAFT CREW P │ CCPsc846    │ ヘビーウェイトファンクショナルファブリック ビッグシルエット 半袖ポロシャツ / │   ¥2,448 │    919 │    ¥2,249,712
+   30位│ MONO-MART     │ WYM LIDNM        │ WYac097     │ Silver 925 CROSS-LINK CHAIN NECKLACE     │   ¥8,000 │    271 │    ¥2,168,000
+   31位│ EMMA CLOTHES  │ CLEL             │ CLEjk1400   │ 【CLEL】Asymmetry Sheer Tailored Jacket /  │   ¥8,100 │    265 │    ¥2,146,500
+   32位│ MONO-MART     │ WYM LIDNM        │ WYsh1675    │ COOL TOUCH MICRO SPAN H/S SHIRT          │   ¥3,600 │    581 │    ¥2,091,600
+   33位│ EMMA CLOTHES  │ CLEL             │ CLEpt1428   │ 【CLEL】Linen Blend 3D Tuck Slacks/リネンブレンド │   ¥4,860 │    412 │    ¥2,002,320
+   34位│ MONO-MART     │ MONO-MART        │ pt1090      │ ヴィンテージメイクタックフレアデニムパンツ                    │   ¥1,800 │   1102 │    ¥1,983,600
+   35位│ MONO-MART     │ MONO-MART        │ sc847       │ U.S. POLO ASSN 別注 ワンポイント刺繍 鹿の子ルーズ半袖ポロシャツ │   ¥2,700 │    734 │    ¥1,981,800
+   36位│ ADRER         │ ADRER            │ ADRlo008    │ Chunky Hybrid Loafer - +6.5cm - / チャンキーハ │   ¥9,000 │    209 │    ¥1,881,000
+   37位│ EMMA CLOTHES  │ Parts Lab.       │ PARsc1483   │ 【Parts Lab.】Summer Knit Short-sleeve Pol │   ¥4,000 │    467 │    ¥1,868,000
+   38位│ EMMA CLOTHES  │ cussil           │ CUSpt981    │ 【cussil/クシル】TRストレッチルーズシルエットハイウエストフレアパンツ/ │   ¥4,500 │    410 │    ¥1,845,000
+   39位│ MONO-MART     │ MONO-MART        │ pt1104      │ ヴィンテージメイクバギーセミワイドデニムパンツ                  │   ¥1,800 │   1025 │    ¥1,845,000
+   40位│ MONO-MART     │ WYM LIDNM        │ WYsc1249    │ EXTRA FINE COTTON BASIC TEE -SLIM CROPPE │   ¥2,000 │    913 │    ¥1,826,000
+   41位│ ADRER         │ ADRER            │ ADRpt1779   │ Extra Quality TR wide straight slacks /  │   ¥5,000 │    362 │    ¥1,810,000
+   42位│ ADRER         │ ADRER            │ ADRpt1313   │ extra quality wide flare pants / エクストラクオ │   ¥3,600 │    490 │    ¥1,764,000
+   43位│ EMMA CLOTHES  │ Parts Lab.       │ PARoc455    │ 【Parts Lab.】T/C Strech Rib Tank Top / T/ │   ¥1,800 │    949 │    ¥1,708,200
+   44位│ MONO-MART     │ WYM LIDNM        │ WYsc1530    │ TONAL MULTI BORDER TEE                   │   ¥3,000 │    559 │    ¥1,677,000
+   45位│ MONO-MART     │ THE CRAFT CREW P │ sd173       │ KEEN キーン UNEEK/ユニーク スニーカーサンダル            │  ¥12,600 │    132 │    ¥1,663,200
+   46位│ EMMA CLOTHES  │ CLEL             │ CLEoc352    │ 【CLEL】High Vintage Design Layered Tank T │   ¥2,700 │    613 │    ¥1,655,100
+   47位│ EMMA CLOTHES  │ LUENNA           │ LUEpt1407   │ 【LUENNA】Semi-flare Denim Pants / セミフレアデニ │   ¥6,000 │    275 │    ¥1,650,000
+   48位│ EMMA CLOTHES  │ CLEL             │ CLElo002    │ 【CLEL】Air Cushion High Sole Loafers/Derb │   ¥7,200 │    220 │    ¥1,584,000
+   49位│ MONO-MART     │ MONO-MART        │ sh1622      │ パウダーツイル レギュラーカラー ベーシック 半袖シャツ ＜マシンウォッシャブル │   ¥2,700 │    548 │    ¥1,479,600
+   50位│ EMMA CLOTHES  │ CLEL             │ CLEsc993    │ 【CLEL】Functionary cotton heavyweight sho │   ¥1,600 │    901 │    ¥1,441,600
+
+━━━ WOMEN TOP 50 (売上順) ━━━
+  期間合計売上 : ¥     68,813,265
+  期間合計販売数:          38,907 点
+  最高売上     : ¥      5,302,620
+  最低売上     : ¥        655,000
+
+  順位｜ ショップ      ｜ 親カテ            ｜ ブランド品番 ｜ 商品名 (40文字)                          ｜ 売価     ｜ 販売数 ｜ 売上
+  ────┼───────────────┼──────────────────┼─────────────┼──────────────────────────────────────────┼──────────┼────────┼──────────────
+    1位│ MONO-MART     │ MONO-MART        │ sc1420      │ U.S. POLO ASSN./ユーエスポロアッスン 別注 ロゴ刺繍 ワッフルヘ │   ¥2,670 │   1986 │    ¥5,302,620
+    2位│ MONO-MART     │ MONO-MART        │ pt1267      │ 速乾×洗える｜カーブタック ワイドスラックス（パウダーツイル）          │   ¥2,438 │   1946 │    ¥4,744,348
+    3位│ MONO-MART     │ MONO-MART        │ sc1032      │ PENNEYS/ペニーズ 別注 THE FOX ロゴ ワンポイントワッペン刺繍  │     ¥900 │   3620 │    ¥3,258,000
+    4位│ MONO-MART     │ MONO-MART        │ jk1361      │ 【COOL BASICシリーズ】 夏快適な着心地｜シングルテーラード 半袖 シャ │   ¥3,256 │    879 │    ¥2,862,342
+    5位│ MONO-MART     │ Snap club        │ UBbg448     │ 【Snap club】ロゴ刺繍 ナイロン ダブルドローコード ナップサック    │   ¥3,600 │    728 │    ¥2,620,800
+    6位│ MONO-MART     │ MONO-MART        │ sc1403      │ PENNEYS/ペニーズ 別注 THE FOX ワンポイント刺繍 ワッフル ヘン │   ¥1,800 │   1194 │    ¥2,149,200
+    7位│ MONO-MART     │ Aunely           │ AUNjk1365   │ 【Aunely】すぐサラ リネンタッチ ひんやり 半袖 シャツジャケット / マ │   ¥3,600 │    583 │    ¥2,098,800
+    8位│ MONO-MART     │ MONO-MART LADY'S │ LDsc749     │ PENNEYS/ペニーズ 別注 THE FOX ロゴ ワッペン刺繍 鹿の子配色ポ │   ¥2,691 │    750 │    ¥2,018,182
+    9位│ BONLECILL     │ BONLECILL        │ BLEsh1667   │ 【UVカット率97%】ライトシアーギャザー 涼しげ オーバーフーディーシャツパー │   ¥2,582 │    737 │    ¥1,902,800
+   10位│ MONO-MART     │ MONO-MART        │ sc1402      │ クールな着心地｜多機能 ポコポコ メロー 優秀Tシャツ (UVカット ・接触冷感 │   ¥1,620 │   1130 │    ¥1,830,600
+   11位│ MONO-MART     │ MONO-MART        │ sc1426      │ カレッジロゴ刺繍 サイドスリット オーバーサイズ 半袖Tシャツ          │   ¥1,800 │    950 │    ¥1,710,000
+   12位│ MONO-MART     │ Unblend          │ LDbg432     │ 【Unblend】異素材切り替え ワンショルダーボディバッグ           │   ¥3,609 │    448 │    ¥1,616,873
+   13位│ MONO-MART     │ MONO-MART        │ pt1422      │ イージードライダンボールワイドスウェットパンツ                  │   ¥1,800 │    873 │    ¥1,571,400
+   14位│ MONO-MART     │ MONO-MART        │ pa697       │ PENNEYS/ペニーズ 別注 THE FOX ロゴ ワンポイントワッペン刺繍オ │     ¥900 │   1736 │    ¥1,562,400
+   15位│ MONO-MART     │ MONO-MART        │ sc1396      │ 【anyway.シリーズ】ワッフル ヘンリーネック 優秀Tシャツ (吸水速乾・毛 │   ¥1,800 │    838 │    ¥1,508,400
+   16位│ MONO-MART     │ MONO-MART        │ sc1377      │ PENNEYS/ペニーズ 別注 THE FOX ロゴ ワンポイント刺繍 ショート │     ¥900 │   1631 │    ¥1,467,900
+   17位│ MONO-MART     │ Snap club        │ UBsc936     │ 【Snap club】ビッグシルエットヴィンテージ加工グラフィック半袖Tシャツ  │   ¥1,800 │    778 │    ¥1,400,400
+   18位│ MONO-MART     │ MONO-MART        │ ls854       │ 【anyway.シリーズ】フローティ シアートップス <スマートウォッシュ>   │   ¥1,350 │    965 │    ¥1,302,750
+   19位│ MONO-MART     │ MONO-MART LADY'S │ LDbg379     │ アソートデザイン ドローコード ナップサック                   │   ¥2,609 │    487 │    ¥1,270,627
+   20位│ Anchor Smith  │ Anchor Smith     │ SMIsc469    │ オーバーサイズ カレッジデザイン半袖Tシャツ                   │   ¥1,800 │    680 │    ¥1,224,000
+   21位│ MONO-MART     │ MONO-MART        │ sc1405      │ 【クールスマートウォッシュ】フローティ シアー 半袖 Tシャツ (接触冷感・毛玉 │     ¥900 │   1339 │    ¥1,205,100
+   22位│ MONO-MART     │ MONO-MART        │ cd928       │ レイヤード風 サマーニットシアー長袖カーディガン＜UV60%カット/接触冷感/マ │   ¥2,430 │    485 │    ¥1,178,550
+   23位│ MONO-MART     │ nui nullu        │ NUIbg431    │ 【nui nullu】2WAYマルチポケットショルダーバッグ           │   ¥3,243 │    347 │    ¥1,125,321
+   24位│ MONO-MART     │ forksy.          │ FObu212     │ 【forksy.】【オケージョン対応】ポインテッドトゥリボンパンプス       │   ¥3,600 │    308 │    ¥1,108,800
+   25位│ BONLECILL     │ BONLECILL        │ BLEsc1448   │ 【2枚入り】半袖 2PACK 華奢見えフライスTシャツ【抗菌防臭/しっかり生地/ │   ¥2,409 │    453 │    ¥1,091,318
+   26位│ BONLECILL     │ BONLECILL        │ BLEsh1243   │ 丸襟ボリュームスリーブオーバーシャツ                       │   ¥3,009 │    339 │    ¥1,020,082
+   27位│ MONO-MART     │ MONO-MART        │ sc614       │ PENNEYS/ペニーズ 別注 THE FOX ロゴ ワッペン刺繍ワンポイント  │   ¥1,440 │    689 │      ¥992,160
+   28位│ MONO-MART     │ MONO-MART        │ sc1385      │ ＜UVカット/接触冷感＞ゆるっとドルマンスリーブ オーバーサイズ 半袖Tシャツ  │   ¥1,274 │    777 │      ¥989,898
+   29位│ MONO-MART     │ MONO-MART        │ ha032       │ VARZAR/バザール stud over fit ball cap / スタッ │   ¥4,527 │    216 │      ¥977,832
+   30位│ MONO-MART     │ MONO-MART        │ sc678       │ ヴィンテージライクロゴデザイン ビッグシルエットリンガー半袖Tシャツ       │   ¥1,800 │    513 │      ¥923,400
+   31位│ MONO-MART     │ MONO-MART        │ pa640       │ イージードライダンボールニットスウェットジップパーカー              │     ¥900 │    994 │      ¥894,600
+   32位│ MONO-MART     │ MONO-MART        │ sc1237      │ 【PEANUTS / SNOOPY】別注 ピーナッツ スヌーピー ヴィンテージプ │   ¥1,800 │    483 │      ¥869,400
+   33位│ Anchor Smith  │ Anchor Smith     │ SMIpt1399   │ ヴィンテージオーバーダイ加工バレルデニムパンツ                  │   ¥3,600 │    230 │      ¥828,000
+   34位│ MONO-MART     │ Snap club        │ UBsc1452    │ 【Snap club】クロップド ワッフル 半袖 ヘンリーネックTシャツ     │   ¥2,446 │    334 │      ¥817,085
+   35位│ BONLECILL     │ BONLECILL        │ BLEoc374    │ 【接触冷感/抗菌防臭】カップ付きダブルストラップベアキャミソール         │   ¥1,264 │    611 │      ¥772,082
+   36位│ MONO-MART     │ Aunely           │ AUNsc1398   │ 【Aunely】ひんやり 360°きれい見え フレンチスリーブ ミニマル Tシャ │   ¥1,440 │    534 │      ¥768,960
+   37位│ MONO-MART     │ MONO-MART LADY'S │ LDsc1007    │ 【PEANUTS / SNOOPY】別注 ピーナッツ スヌーピー&フレンズ ヴィ │   ¥1,800 │    424 │      ¥763,200
+   38位│ MONO-MART     │ Aunely           │ AUNjk1364   │ 【Aunely】すぐサラ シアー ライトエア 涼しげ ダブル テーラードジャケッ │   ¥2,700 │    282 │      ¥761,400
+   39位│ MONO-MART     │ MONO-MART        │ sc1409      │ PENNEYS/ペニーズ 別注 THE FOX ワンポイント刺繍 ラグランスリー │   ¥1,250 │    592 │      ¥740,000
+   40位│ MONO-MART     │ MONO-MART LADY'S │ LDsh1007    │ ビッグアソートナンバリング刺繍ボタンダウン半袖シャツ               │   ¥2,718 │    268 │      ¥728,473
+   41位│ MONO-MART     │ MONO-MART LADY'S │ LDsc942     │ 【Disney】Mickey&Friends ミッキー＆フレンズ / 別注 グラ │   ¥2,700 │    265 │      ¥715,500
+   42位│ MONO-MART     │ Unblend          │ LDpt1395    │ 【Unblend】ストライプ ルーズ イージーパンツ               │   ¥2,700 │    262 │      ¥707,400
+   43位│ MONO-MART     │ Snap club        │ UBpa699     │ 【Snap club】ヴィンテージ加工 ダメージパッチロゴ ダブルジップパーカー │   ¥2,250 │    314 │      ¥706,500
+   44位│ MONO-MART     │ THE CRAFT CREW P │ CCPoc442    │ 接触冷感 カップ付き ヘンリーネック リブタンクトップ / UVカット【THE  │     ¥900 │    771 │      ¥693,900
+   45位│ MONO-MART     │ MONO-MART        │ ls576       │ PENNEYS/ペニーズ 別注 THE FOX ロゴ ワンポイントワッペン刺繍オ │     ¥900 │    770 │      ¥693,000
+   46位│ MONO-MART     │ forksy.          │ FOcd919     │ 【forksy.】<エブリデイシリーズ>楊柳 メロー カーディガン / UVカッ │   ¥1,809 │    370 │      ¥669,364
+   47位│ MONO-MART     │ MONO-MART        │ pt1577      │ 【サステナブル】ヴィンテージライク ハイウエストストレートデニムパンツ      │     ¥300 │   2226 │      ¥667,800
+   48位│ MONO-MART     │ THE CRAFT CREW P │ CCPpt1703   │ バックツイルカーブパンツ〈マシンウォッシャブル〉【THE CRAFT CREW  │   ¥1,800 │    370 │      ¥666,000
+   49位│ MONO-MART     │ MONO-MART        │ pt1776      │ 10.5oz タックワイドシルエット イージー カーブデニムパンツ＜速乾/マシン │   ¥2,438 │    271 │      ¥660,698
+   50位│ MONO-MART     │ Snap club        │ UBpt1641    │ 【Snap club】ヴィンテージ加工ワイドカーブデニムパンツ          │   ¥5,000 │    131 │      ¥655,000
+

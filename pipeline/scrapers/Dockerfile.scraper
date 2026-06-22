@@ -1,0 +1,27 @@
+# Cloud Run Job container for ZOZO scraping
+# Uses Playwright's official Chromium image (already includes browsers)
+FROM mcr.microsoft.com/playwright/python:v1.45.0-jammy
+
+WORKDIR /app
+
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tzdata && \
+    rm -rf /var/lib/apt/lists/* && \
+    ln -snf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
+
+# Python deps
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Scraper source
+COPY scrapers/ /app/scrapers/
+
+# Non-root user (Playwright requires special user 'pwuser' in this image)
+USER pwuser
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=utf-8 \
+    TZ=Asia/Tokyo \
+    HEADLESS=1
+
+ENTRYPOINT ["python", "-u", "scrapers/zozo_scraper.py"]

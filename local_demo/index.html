@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商品発注判断支援システム</title>
+<style>
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Meiryo', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  font-size: 15px;
+  background: #f0f2f5;
+  color: #1e2229;
+  line-height: 1.5;
+}
+button { cursor: pointer; font-family: inherit; }
+input, select { font-family: inherit; }
+
+/* ── Header ── */
+#header {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 28px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.header-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.header-brand h1 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e2229;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.header-brand .subtitle {
+  font-size: 12px;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.header-controls input[type=date],
+.header-controls select {
+  background: #ffffff;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: #1e2229;
+  height: 34px;
+}
+.header-controls input[type=date]:focus,
+.header-controls select:focus {
+  outline: none;
+  border-color: #4f46e5;
+}
+
+.btn {
+  border-radius: 6px;
+  padding: 0 14px;
+  height: 34px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+.btn-ghost {
+  background: #ffffff;
+  border: 1px solid #d0d5dd;
+  color: #374151;
+}
+.btn-ghost:hover { background: #f3f4f6; }
+.btn-primary { background: #4f46e5; color: #fff; }
+.btn-primary:hover { background: #4338ca; }
+.btn-export { background: #16a34a; color: #fff; }
+.btn-export:hover { background: #15803d; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Page layout ── */
+#main {
+  max-width: 100%;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Error bar ── */
+#error-bar {
+  display: none;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+/* ── KPI row ── */
+#kpi-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+.kpi-card {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 16px 18px;
+  border-top: 3px solid #e5e7eb;
+  position: relative;
+  overflow: hidden;
+}
+.kpi-card::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 60px; height: 60px;
+  border-radius: 0 0 0 60px;
+  opacity: 0.06;
+}
+.kpi-card.red   { border-top-color: #ef4444; }
+.kpi-card.red::after   { background: #ef4444; }
+.kpi-card.amber { border-top-color: #f59e0b; }
+.kpi-card.amber::after { background: #f59e0b; }
+.kpi-card.blue  { border-top-color: #3b82f6; }
+.kpi-card.blue::after  { background: #3b82f6; }
+.kpi-card.green { border-top-color: #22c55e; }
+.kpi-card.green::after { background: #22c55e; }
+.kpi-card.purple { border-top-color: #8b5cf6; }
+.kpi-card.purple::after { background: #8b5cf6; }
+.kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  margin-bottom: 6px;
+}
+.kpi-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1;
+}
+.kpi-sub {
+  font-size: 11px;
+  color: #b0b8c9;
+  margin-top: 5px;
+}
+
+/* ── Alert panel ── */
+#alert-panel {
+  display: none;
+  background: #fff;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #ef4444;
+  border-radius: 8px;
+  padding: 14px 18px;
+}
+.alert-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.alert-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+#alert-panel h2 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #b91c1c;
+}
+#alert-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.alert-chip {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.alert-chip:hover { background: #fee2e2; }
+.alert-chip .pc { font-weight: 700; color: #1e2229; font-family: Consolas, monospace; }
+.alert-chip .cnt { color: #dc2626; font-weight: 700; }
+
+/* ── Matrix modal ── */
+#matrix-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  backdrop-filter: blur(2px);
+}
+#matrix-overlay.open { display: flex; }
+#matrix-panel {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  width: 100%;
+  max-width: 780px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modal-in 0.18s ease;
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(-12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+#matrix-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+#matrix-panel-header h2 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e2229;
+}
+#matrix-panel-header button {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f3f4f6;
+  border: 1px solid #d0d5dd;
+  padding: 5px 12px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+#matrix-panel-header button:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+#matrix-content { padding: 20px; overflow: auto; }
+#matrix-table { border-collapse: collapse; font-size: 13px; }
+#matrix-table th,
+#matrix-table td { border: 1px solid #e5e7eb; padding: 8px 14px; text-align: center; }
+#matrix-table th { background: #f9fafb; font-weight: 700; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.matrix-cell-inner .inv { font-weight: 700; font-size: 14px; }
+.matrix-cell-inner .vel { color: #9ca3af; font-size: 11px; margin-top: 3px; }
+.matrix-cell-inner .rec { color: #4f46e5; font-weight: 700; font-size: 12px; margin-top: 3px; }
+#matrix-legend { font-size: 11px; color: #b0b8c9; margin-top: 12px; }
+
+/* ── Simulation modal ── */
+#sim-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 300;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 36px 16px;
+  backdrop-filter: blur(2px);
+  overflow-y: auto;
+}
+#sim-overlay.open { display: flex; }
+#sim-panel {
+  background: #f8f9fb;
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.28);
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modal-in 0.18s ease;
+}
+#sim-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+#sim-panel-header h2 { font-size: 14px; font-weight: 700; color: #1e2229; }
+#sim-panel-header p  { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+#sim-panel-header button {
+  font-size: 12px; font-weight: 600; color: #6b7280;
+  background: #f3f4f6; border: 1px solid #d0d5dd;
+  padding: 5px 12px; border-radius: 6px;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+#sim-panel-header button:hover { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+#sim-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Current snapshot */
+.sim-section { background:#fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; }
+.sim-section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #9ca3af; margin-bottom: 10px; }
+.sim-snapshot-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 16px; font-size: 12px; }
+.sim-snap-item span:first-child { display:block; color:#9ca3af; font-size:11px; }
+.sim-snap-item span:last-child  { font-weight:600; color:#1e2229; }
+
+/* Scenario cards */
+.sim-scenarios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.sim-card {
+  background:#fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.sim-card.recommended { border: 2px solid #6366f1; }
+.sim-card-rec-badge { font-size:10px; font-weight:700; background:#eef2ff; color:#4f46e5; padding:2px 8px; border-radius:20px; display:inline-block; margin-bottom:2px; }
+.sim-card-title { font-size:13px; font-weight:700; color:#1e2229; }
+.sim-card-desc  { font-size:11px; color:#9ca3af; line-height:1.4; }
+.sim-card-metrics { display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; font-size:11px; margin-top:4px; }
+.sim-card-metrics .ml { color:#9ca3af; }
+.sim-card-metrics .mr { font-weight:600; text-align:right; }
+.sim-card-metrics .mr.profit-pos { color:#16a34a; }
+.sim-card-metrics .mr.profit-neg { color:#dc2626; }
+.sim-card-metrics .mr.stockout  { color:#dc2626; }
+.sim-card-metrics .mr.ok        { color:#16a34a; }
+
+/* Stock chart */
+#sim-chart-wrap { overflow: hidden; }
+#sim-chart-wrap svg { width:100%; height:140px; display:block; border: 1px solid #f0f2f5; border-radius:6px; background:#fafafa; }
+.sim-chart-legend { display:flex; flex-wrap:wrap; gap:8px 16px; margin-bottom:8px; font-size:11px; }
+.sim-chart-legend span { display:flex; align-items:center; gap:5px; color:#6b7280; }
+.sim-chart-legend .dot { width:14px; height:2px; border-radius:2px; display:inline-block; }
+
+/* Custom qty */
+.sim-custom { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.sim-custom input {
+  border:1px solid #d0d5dd; border-radius:6px; padding:7px 12px;
+  font-size:13px; width:140px; font-family:Consolas,monospace;
+}
+.sim-custom input:focus { outline:none; border-color:#4f46e5; }
+
+/* ── Table area ── */
+#table-area {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+#table-toolbar {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f2f5;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+#search {
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 14px;
+  width: 280px;
+  color: #1e2229;
+  background: #fdfdfd;
+  transition: border-color 0.15s;
+}
+#search:focus { outline: none; border-color: #4f46e5; }
+#row-count {
+  font-size: 12px;
+  color: #b0b8c9;
+  margin-left: 2px;
+}
+#table-scroll {
+  overflow-x: auto;
+  max-height: calc(100vh - 320px);
+}
+
+/* ── Main table ── */
+#data-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  white-space: nowrap;
+}
+#data-table thead { position: sticky; top: 0; z-index: 10; }
+#data-table th {
+  background: #f8f9fb;
+  border-bottom: 2px solid #e5e7eb;
+  border-right: 1px solid #eef0f3;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+#data-table th:last-child { border-right: none; }
+#data-table th:hover { background: #eff1f7; color: #374151; }
+#data-table th.sorted-asc::after  { content: " ▲"; color: #4f46e5; }
+#data-table th.sorted-desc::after { content: " ▼"; color: #4f46e5; }
+#data-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #f3f4f6;
+  border-right: 1px solid #f8f9fb;
+  vertical-align: middle;
+}
+#data-table td:last-child { border-right: none; }
+#data-table tr:last-child td { border-bottom: none; }
+#data-table tr:hover td { background-color: rgba(0,0,0,0.018) !important; }
+#data-table .num { font-family: 'Consolas', 'Courier New', monospace; text-align: right; }
+#data-table .center { text-align: center; }
+#data-table .neg { color: #dc2626; font-weight: 700; }
+#data-table .pos { color: #15803d; }
+#data-table .pc-link {
+  color: #4f46e5;
+  cursor: pointer;
+  font-weight: 700;
+  text-decoration: none;
+  font-family: Consolas, monospace;
+  border-bottom: 1px dotted #a5b4fc;
+}
+#data-table .pc-link:hover { color: #3730a3; border-bottom-color: #3730a3; }
+
+/* ── Row colours ── */
+.row-CRITICAL  { background: #fef7f7; }
+.row-WARNING   { background: #fefdf5; }
+.row-OK        { background: #ffffff; }
+.row-OVERSTOCK { background: #f5f8ff; }
+
+/* ── Urgency badges ── */
+.badge {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+}
+.badge-CRITICAL  { background: #fee2e2; color: #b91c1c; }
+.badge-WARNING   { background: #fef3c7; color: #92400e; }
+.badge-OK        { background: #dcfce7; color: #166534; }
+.badge-OVERSTOCK { background: #dbeafe; color: #1e40af; }
+
+/* ── Sparkline ── */
+.spark { display: inline-block; width: 70px; height: 22px; vertical-align: middle; }
+
+/* ── Trend indicator ── */
+.trend-up   { color: #16a34a; font-weight: 700; }
+.trend-down { color: #dc2626; }
+.trend-flat { color: #9ca3af; }
+
+/* ── Loading ── */
+#loading {
+  display: none;
+  text-align: center;
+  padding: 48px;
+  color: #b0b8c9;
+  font-size: 13px;
+}
+
+/* ── Footer ── */
+#footer {
+  text-align: right;
+  font-size: 11px;
+  color: #c4c9d4;
+  padding: 0 4px;
+}
+
+/* ── Tab nav ── */
+#tab-nav {
+  display: flex;
+  gap: 2px;
+  padding: 0 24px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 56px;
+  z-index: 90;
+}
+.tab-btn {
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: #1e2229; }
+.tab-btn.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+
+/* ── Page sections ── */
+.page-section { display: none; }
+.page-section.active { display: block; }
+
+/* ── Status page layout ── */
+#status-main {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Status summary cards ── */
+#status-kpi-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+/* ── Run history table ── */
+.status-panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.status-panel-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.status-panel-header h2 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e2229;
+}
+.status-panel-header .hint {
+  font-size: 11px;
+  color: #b0b8c9;
+}
+.status-panel-body { padding: 0; }
+
+.run-list { width: 100%; border-collapse: collapse; font-size: 13px; }
+.run-list th {
+  background: #f8f9fb;
+  border-bottom: 2px solid #e5e7eb;
+  padding: 8px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.run-list td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+.run-list tr:last-child td { border-bottom: none; }
+.run-list tr:hover td { background: #fafafa; }
+
+/* ── Step breakdown (expandable) ── */
+.steps-row td { padding: 0 !important; background: #f8f9fb; }
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  background: #e5e7eb;
+  padding: 0;
+}
+.step-cell {
+  background: #fff;
+  padding: 10px 12px;
+  font-size: 11px;
+}
+.step-cell .step-label { font-weight: 600; color: #374151; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.step-cell .step-rows  { color: #6b7280; }
+.step-cell .step-dur   { color: #9ca3af; margin-top: 2px; }
+.step-cell .step-err   { color: #b91c1c; font-size: 10px; margin-top: 3px; white-space: normal; }
+.step-cell.step-ok   { border-top: 2px solid #22c55e; }
+.step-cell.step-fail { border-top: 2px solid #ef4444; background: #fef7f7; }
+.step-cell.step-skip { border-top: 2px solid #d1d5db; background: #f9fafb; opacity: 0.6; }
+
+/* ── Quality checks table ── */
+.quality-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 16px;
+}
+.quality-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.quality-card-header {
+  padding: 10px 14px;
+  background: #f8f9fb;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.quality-card-header .ds-name { font-size: 13px; font-weight: 700; color: #1e2229; }
+.quality-card-header .ds-rows { font-size: 11px; color: #9ca3af; }
+.quality-checks-list { padding: 8px 0; }
+.quality-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 14px;
+  font-size: 12px;
+}
+.quality-check-row .qc-icon { flex-shrink: 0; margin-top: 1px; }
+.quality-check-row .qc-name { color: #6b7280; width: 160px; flex-shrink: 0; font-family: Consolas, monospace; font-size: 11px; }
+.quality-check-row .qc-msg  { color: #374151; flex: 1; }
+.quality-check-row.qc-fail .qc-msg { color: #b91c1c; font-weight: 600; }
+
+/* ── Table count cards ── */
+.table-counts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 16px;
+}
+.tc-card {
+  background: #f8f9fb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tc-name { font-size: 11px; color: #6b7280; }
+.tc-dataset { font-size: 10px; color: #b0b8c9; font-family: Consolas, monospace; margin-top: 1px; }
+.tc-count { font-size: 18px; font-weight: 800; color: #1e2229; font-family: Consolas, monospace; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <div class="header-brand">
+    <h1>商品発注判断支援システム</h1>
+    <div class="subtitle" id="header-sub">発注分析表</div>
+  </div>
+  <div class="header-controls">
+    <input type="date" id="date-picker" />
+    <select id="urgency-filter">
+      <option value="">全ステータス</option>
+      <option value="CRITICAL">欠品のみ</option>
+      <option value="WARNING">警告のみ</option>
+      <option value="OK">OK</option>
+      <option value="OVERSTOCK">過剰在庫</option>
+    </select>
+    <button class="btn btn-ghost" onclick="loadData()">更新</button>
+    <button class="btn btn-export" onclick="exportCSV()">CSV出力</button>
+  </div>
+</div>
+
+<!-- Tab nav -->
+<div id="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('analysis')">発注分析</button>
+  <button class="tab-btn" onclick="switchTab('status')">データ確認</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     TAB 1: Order Analysis
+══════════════════════════════════════════════════════════ -->
+<div id="tab-analysis" class="page-section active">
+<!-- Main -->
+<div id="main">
+  <div id="error-bar"></div>
+
+  <!-- KPI cards -->
+  <div id="kpi-bar">
+    <div class="kpi-card red">
+      <div class="kpi-label">欠品SKU</div>
+      <div class="kpi-value" id="kpi-critical">-</div>
+      <div class="kpi-sub">在庫切れ・マイナス</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">警告SKU</div>
+      <div class="kpi-value" id="kpi-warning">-</div>
+      <div class="kpi-sub">14日以内に欠品リスク</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">過剰在庫SKU</div>
+      <div class="kpi-value" id="kpi-overstock">-</div>
+      <div class="kpi-sub">90日超の在庫</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">合計推奨発注数</div>
+      <div class="kpi-value" id="kpi-order">-</div>
+      <div class="kpi-sub">全SKU合計</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">平均在庫日数</div>
+      <div class="kpi-value" id="kpi-days">-</div>
+      <div class="kpi-sub">7日販売ベース</div>
+    </div>
+  </div>
+
+  <!-- Alert panel -->
+  <div id="alert-panel">
+    <div class="alert-header">
+      <div class="alert-dot"></div>
+      <h2 id="alert-title">緊急対応が必要な欠品SKU</h2>
+    </div>
+    <div id="alert-chips"></div>
+  </div>
+
+  <!-- Table -->
+  <div id="table-area">
+    <div id="table-toolbar">
+      <input type="text" id="search" placeholder="品番・カラー・サイズで検索..." oninput="filterTable()" />
+      <span id="row-count"></span>
+    </div>
+    <div id="loading">データを読み込み中...</div>
+    <div id="table-scroll">
+      <table id="data-table">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="footer"></div>
+</div>
+</div><!-- /tab-analysis -->
+
+<!-- ══════════════════════════════════════════════════════════
+     TAB 2: Data Verification
+══════════════════════════════════════════════════════════ -->
+<div id="tab-status" class="page-section">
+<div id="status-main">
+
+  <!-- Summary KPI cards -->
+  <div id="status-kpi-bar">
+    <div class="kpi-card green">
+      <div class="kpi-label">直近7日 成功率</div>
+      <div class="kpi-value" id="sk-success-rate">-</div>
+      <div class="kpi-sub">パイプライン実行</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">直近7日 失敗数</div>
+      <div class="kpi-value" id="sk-failures">-</div>
+      <div class="kpi-sub">要確認</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">最終実行日</div>
+      <div class="kpi-value" id="sk-last-run" style="font-size:18px">-</div>
+      <div class="kpi-sub" id="sk-last-status">-</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">管理SKU数</div>
+      <div class="kpi-value" id="sk-skus">-</div>
+      <div class="kpi-sub">mart_layer</div>
+    </div>
+  </div>
+
+  <!-- Pipeline run history -->
+  <div class="status-panel">
+    <div class="status-panel-header">
+      <h2>パイプライン実行履歴（直近7日）</h2>
+      <span class="hint">品番をクリックでステップ詳細を展開</span>
+    </div>
+    <div class="status-panel-body">
+      <table class="run-list" id="run-history-table">
+        <thead>
+          <tr>
+            <th>実行日</th>
+            <th>ステータス</th>
+            <th>総時間</th>
+            <th>完了ステップ</th>
+            <th>開始時刻 (UTC)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="run-history-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Data quality checks -->
+  <div class="status-panel">
+    <div class="status-panel-header">
+      <h2>データ品質チェック結果</h2>
+      <span class="hint" id="quality-date-label">-</span>
+    </div>
+    <div class="status-panel-body">
+      <div class="quality-grid" id="quality-grid"></div>
+    </div>
+  </div>
+
+  <!-- Table row counts -->
+  <div class="status-panel">
+    <div class="status-panel-header">
+      <h2>BigQuery テーブル行数スナップショット</h2>
+      <span class="hint">本日時点</span>
+    </div>
+    <div class="status-panel-body">
+      <div class="table-counts-grid" id="table-counts-grid"></div>
+    </div>
+  </div>
+
+</div>
+</div><!-- /tab-status -->
+
+<!-- Simulation modal -->
+<div id="sim-overlay" onclick="onSimOverlayClick(event)">
+  <div id="sim-panel">
+    <div id="sim-panel-header">
+      <div>
+        <h2>発注シミュレーション</h2>
+        <p id="sim-panel-subtitle">-</p>
+      </div>
+      <button onclick="closeSim()">閉じる ✕</button>
+    </div>
+    <div id="sim-body">
+      <div id="sim-loading" style="text-align:center;padding:40px;color:#9ca3af;font-size:13px">シミュレーション計算中...</div>
+      <div id="sim-content" style="display:none;display:flex;flex-direction:column;gap:14px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Matrix modal -->
+<div id="matrix-overlay" onclick="onOverlayClick(event)">
+  <div id="matrix-panel">
+    <div id="matrix-panel-header">
+      <h2 id="matrix-title">サイズ×カラー内訳</h2>
+      <button onclick="closeMatrix()">閉じる ✕</button>
+    </div>
+    <div id="matrix-content"></div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let allRows = [];
+let filteredRows = [];
+let sortCol = null;
+let sortDir = 1; // 1=asc, -1=desc
+
+// ── Column definitions ────────────────────────────────────────────────────────
+const COLS = [
+  { key: 'order_urgency',       label: '緊急度',      w: 55,  render: renderBadge },
+  { key: 'maker_color_code',    label: 'メーカーカラー', w: 90, mono: true },
+  { key: 'product_code',        label: '品番',        w: 75,  render: renderPCLink, mono: true },
+  { key: 'color_name',          label: 'カラー',      w: 80 },
+  { key: 'size',                label: 'サイズ',      w: 40,  center: true },
+  { key: 'sku_code',            label: 'CS品番',      w: 55,  mono: true },
+  { key: 'shelf_type',          label: '棚',          w: 45,  center: true },
+  { key: 'inventory',           label: '在庫',        w: 55,  num: true },
+  { key: 'incoming_stock',      label: '入荷残',      w: 55,  num: true, colorFn: v => v > 0 ? 'color:#2563eb' : '' },
+  { key: 'free_inventory',      label: 'フリー在庫',  w: 72,  num: true, negBold: true },
+  { key: 'reservations_pending',label: '予約未処理',  w: 68,  num: true },
+  { key: 'sales_7d',            label: '7日間',       w: 52,  num: true },
+  { key: 'sales_30d',           label: '一ヶ月',      w: 52,  num: true },
+  { key: 'sales_2w',            label: '直近2週',     w: 55,  num: true },
+  { key: 'sales_ytd',           label: '年度累計',    w: 60,  num: true },
+  { key: 'favorites_total',     label: 'お気に入り',  w: 70,  num: true, colorFn: () => 'color:#db2777' },
+  { key: 'stock_days_7d',       label: '在庫日数',    w: 65,  render: renderDays },
+  { key: 'monthly_gap',         label: '1ヶ月差分',   w: 70,  num: true, negBold: true },
+  { key: 'trend_coefficient',   label: 'トレンド',    w: 62,  render: renderTrend },
+  { key: 'recommended_order_qty', label: '推奨発注数', w: 72, render: renderRec },
+  { key: 'gross_margin_pct',    label: '粗利率',      w: 52,  render: v => v != null ? (v*100).toFixed(1)+'%' : '-' },
+  { key: 'daily_sales_30d',     label: '日次推移',    w: 80,  render: renderSpark, noSort: true },
+  { key: '_simulate',           label: '',             w: 60,  render: (v, row) =>
+      `<button onclick="event.stopPropagation();openSim('${row.sku_code}')"
+        style="padding:3px 8px;font-size:11px;font-weight:600;color:#4f46e5;border:1px solid #c7d2fe;border-radius:5px;background:#eef2ff;cursor:pointer">試算</button>`,
+    noSort: true },
+];
+
+// ── Render helpers ────────────────────────────────────────────────────────────
+function renderBadge(v) {
+  const map = { CRITICAL: ['欠品','badge-CRITICAL'], WARNING: ['警告','badge-WARNING'], OK: ['OK','badge-OK'], OVERSTOCK: ['過剰','badge-OVERSTOCK'] };
+  const [label, cls] = map[v] || ['?',''];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+function renderPCLink(v, row) {
+  return `<span class="pc-link" onclick="showMatrix('${v}')">${v}</span>`;
+}
+function renderDays(v) {
+  if (v == null) return '<span style="color:#ccc">-</span>';
+  const n = Math.round(v);
+  const color = v <= 0 ? '#dc2626' : v <= 14 ? '#d97706' : v >= 90 ? '#2563eb' : '#111';
+  const weight = Math.abs(v) <= 14 ? '700' : '400';
+  return `<span class="num" style="color:${color};font-weight:${weight}">${n}日</span>`;
+}
+function renderTrend(v) {
+  if (v == null) return '-';
+  const pct = ((v - 1) * 100).toFixed(1);
+  const cls = v > 1.05 ? 'trend-up' : v < 0.95 ? 'trend-down' : 'trend-flat';
+  const sign = v >= 1 ? '+' : '';
+  return `<span class="${cls}">${sign}${pct}%</span>`;
+}
+function renderRec(v) {
+  if (!v) return '<span style="color:#ccc">-</span>';
+  return `<span class="num" style="color:#4f46e5;font-weight:800">${fmt(v)}</span>`;
+}
+function renderSpark(data) {
+  if (!data || data.length === 0) return '<span style="color:#ccc">-</span>';
+  const vals = [...data].sort((a,b) => a.sale_date.localeCompare(b.sale_date)).map(d => d.qty);
+  return `<canvas class="spark" data-vals="${vals.join(',')}"></canvas>`;
+}
+
+function fmt(n) { return n == null ? '-' : Number(n).toLocaleString('ja-JP'); }
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+async function loadData() {
+  const date = document.getElementById('date-picker').value;
+  const urgency = document.getElementById('urgency-filter').value;
+  setLoading(true);
+  try {
+    let url = `${API}/api/products?date=${date}`;
+    if (urgency) url += `&urgency=${urgency}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    allRows = json.data || [];
+    filteredRows = allRows;
+    updateKPIs();
+    updateAlertPanel();
+    filterTable();
+    hideError();
+    document.getElementById('footer').textContent =
+      allRows.length > 0 ? `最終計算: ${allRows[0].computed_at || ''}` : '';
+  } catch(e) {
+    showError('データ取得エラー: ' + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function setLoading(on) {
+  document.getElementById('loading').style.display = on ? 'block' : 'none';
+  document.getElementById('table-scroll').style.display = on ? 'none' : 'block';
+}
+function showError(msg) {
+  const el = document.getElementById('error-bar');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('error-bar').style.display = 'none';
+}
+
+// ── KPI update ────────────────────────────────────────────────────────────────
+function updateKPIs() {
+  const critical  = allRows.filter(r => r.order_urgency === 'CRITICAL').length;
+  const warning   = allRows.filter(r => r.order_urgency === 'WARNING').length;
+  const overstock = allRows.filter(r => r.order_urgency === 'OVERSTOCK').length;
+  const totalOrd  = allRows.reduce((s, r) => s + (r.recommended_order_qty || 0), 0);
+  const daysRows  = allRows.filter(r => r.stock_days_7d != null);
+  const avgDays   = daysRows.length > 0 ? daysRows.reduce((s,r) => s + r.stock_days_7d, 0) / daysRows.length : null;
+
+  document.getElementById('kpi-critical').textContent  = fmt(critical);
+  document.getElementById('kpi-warning').textContent   = fmt(warning);
+  document.getElementById('kpi-overstock').textContent = fmt(overstock);
+  document.getElementById('kpi-order').textContent     = fmt(totalOrd);
+  document.getElementById('kpi-days').textContent      = avgDays != null ? Math.round(avgDays) + '日' : '-';
+}
+
+// ── Alert panel ───────────────────────────────────────────────────────────────
+function updateAlertPanel() {
+  const criticals = allRows.filter(r => r.order_urgency === 'CRITICAL');
+  const panel = document.getElementById('alert-panel');
+  if (criticals.length === 0) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  document.getElementById('alert-title').textContent = `緊急対応が必要な欠品SKU (${criticals.length}件)`;
+  const chips = document.getElementById('alert-chips');
+  chips.innerHTML = criticals.slice(0, 12).map(r =>
+    `<span class="alert-chip" onclick="showMatrix('${r.product_code}')">
+       <span class="pc">${r.product_code}</span> ${r.color_name}/${r.size}
+       <span class="cnt">(${r.free_inventory})</span>
+     </span>`
+  ).join('') + (criticals.length > 12 ? `<span style="font-size:11px;color:#dc2626;align-self:center"> ...他${criticals.length-12}件</span>` : '');
+}
+
+// ── Matrix panel ──────────────────────────────────────────────────────────────
+function showMatrix(productCode) {
+  const rows = allRows.filter(r => r.product_code === productCode);
+  if (!rows.length) return;
+  const pname = rows[0].product_name;
+  document.getElementById('matrix-title').textContent = `サイズ×カラー内訳: ${productCode} ${pname}`;
+
+  const colors = [...new Set(rows.map(r => r.color_name))];
+  const sizes  = [...new Set(rows.map(r => r.size))];
+  const ORDER = ['XS','S','M','L','XL','2XL'];
+  sizes.sort((a,b) => { const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+
+  const lookup = {};
+  rows.forEach(r => { lookup[`${r.color_name}__${r.size}`] = r; });
+
+  const URGBG = { CRITICAL:'#fff5f5', WARNING:'#fffcf0', OK:'#fff', OVERSTOCK:'#eff6ff' };
+
+  let html = '<table id="matrix-table"><thead><tr><th>カラー</th>';
+  sizes.forEach(sz => html += `<th>${sz}</th>`);
+  html += '</tr></thead><tbody>';
+  colors.forEach(color => {
+    html += `<tr><td style="font-weight:700;background:#f9fafb;white-space:nowrap">${color}</td>`;
+    sizes.forEach(sz => {
+      const r = lookup[`${color}__${sz}`];
+      if (!r) { html += '<td style="color:#ccc">-</td>'; return; }
+      const bg = URGBG[r.order_urgency] || '#fff';
+      const freeColor = r.free_inventory < 0 ? '#dc2626' : '#111';
+      html += `<td style="background:${bg}">
+        <div class="matrix-cell-inner">
+          <div class="inv" style="color:${freeColor}">${fmt(r.free_inventory)}</div>
+          <div class="vel">${r.sales_7d}日/${r.stock_days_7d != null ? Math.round(r.stock_days_7d)+'日' : '-'}</div>
+          ${r.recommended_order_qty > 0 ? `<div class="rec">→${fmt(r.recommended_order_qty)}</div>` : ''}
+        </div></td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table><p id="matrix-legend">セル内: フリー在庫 / 7日販売・在庫日数 / 推奨発注数</p>';
+  document.getElementById('matrix-content').innerHTML = html;
+  document.getElementById('matrix-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeMatrix() {
+  document.getElementById('matrix-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function onOverlayClick(e) {
+  if (e.target === document.getElementById('matrix-overlay')) closeMatrix();
+}
+
+// ── Table rendering ───────────────────────────────────────────────────────────
+function buildHeader() {
+  const thead = document.getElementById('thead');
+  let html = '<tr>';
+  COLS.forEach((col, i) => {
+    let cls = '';
+    if (sortCol === col.key) cls = sortDir === 1 ? 'sorted-asc' : 'sorted-desc';
+    const clickHandler = col.noSort ? '' : `onclick="sortBy('${col.key}')"`;
+    html += `<th style="min-width:${col.w}px" class="${cls}" ${clickHandler}>${col.label}</th>`;
+  });
+  thead.innerHTML = html + '</tr>';
+}
+
+function renderRows(rows) {
+  const tbody = document.getElementById('tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="99" style="text-align:center;padding:40px;color:#b0b8c9">データがありません</td></tr>';
+    return;
+  }
+  let html = '';
+  rows.forEach(row => {
+    html += `<tr class="row-${row.order_urgency}">`;
+    COLS.forEach(col => {
+      let val = row[col.key];
+      let cell = '';
+      if (col.render) {
+        cell = col.render(val, row) ?? '-';
+      } else if (col.num) {
+        const colored = col.negBold && val < 0 ? ` class="neg"` : col.colorFn ? ` style="${col.colorFn(val)}"` : '';
+        const display = val == null ? '-' : (col.negBold && val < 0 ? '' : (val > 0 ? '' : '')) + fmt(val);
+        cell = `<span class="num"${colored}>${fmt(val)}</span>`;
+        if (col.negBold && val < 0) cell = `<span class="num neg">${fmt(val)}</span>`;
+      } else {
+        cell = val ?? '-';
+        if (col.mono) cell = `<span style="font-family:Consolas,monospace">${cell}</span>`;
+        if (col.center) cell = `<span style="display:block;text-align:center">${cell}</span>`;
+      }
+      html += `<td>${cell}</td>`;
+    });
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+  // Draw sparklines
+  document.querySelectorAll('canvas.spark').forEach(canvas => {
+    const vals = canvas.dataset.vals.split(',').map(Number);
+    drawSparkline(canvas, vals);
+  });
+}
+
+function drawSparkline(canvas, vals) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width  = 70;
+  const H = canvas.height = 22;
+  const max = Math.max(...vals, 1);
+  const min = 0;
+  const pts = vals.map((v, i) => ({
+    x: (i / (vals.length - 1)) * (W - 4) + 2,
+    y: H - 2 - ((v - min) / (max - min)) * (H - 4),
+  }));
+  // Mean reference line
+  const avg = vals.reduce((s,v) => s+v, 0) / vals.length;
+  const avgY = H - 2 - ((avg - min) / (max - min)) * (H - 4);
+  ctx.setLineDash([2, 2]);
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, avgY); ctx.lineTo(W, avgY); ctx.stroke();
+  ctx.setLineDash([]);
+  // Line
+  ctx.strokeStyle = '#4f46e5';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.stroke();
+  // Last dot
+  if (pts.length > 0) {
+    const last = pts[pts.length - 1];
+    ctx.fillStyle = '#4f46e5';
+    ctx.beginPath(); ctx.arc(last.x, last.y, 2, 0, Math.PI*2); ctx.fill();
+  }
+}
+
+// ── Search & sort ─────────────────────────────────────────────────────────────
+function filterTable() {
+  const q = document.getElementById('search').value.toLowerCase();
+  if (!q) {
+    filteredRows = allRows;
+  } else {
+    filteredRows = allRows.filter(r =>
+      (r.product_code  || '').toLowerCase().includes(q) ||
+      (r.color_name    || '').toLowerCase().includes(q) ||
+      (r.size          || '').toLowerCase().includes(q) ||
+      (r.product_name  || '').toLowerCase().includes(q) ||
+      (r.maker_color_code || '').toLowerCase().includes(q)
+    );
+  }
+  document.getElementById('row-count').textContent = `${filteredRows.length.toLocaleString()} / ${allRows.length.toLocaleString()} SKU`;
+  buildHeader();
+  renderRows(filteredRows);
+}
+
+function sortBy(key) {
+  if (sortCol === key) { sortDir = -sortDir; }
+  else { sortCol = key; sortDir = 1; }
+  filteredRows.sort((a, b) => {
+    let av = a[key], bv = b[key];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (key === 'order_urgency') {
+      const order = { CRITICAL: 0, WARNING: 1, OK: 2, OVERSTOCK: 3 };
+      return (order[av] - order[bv]) * sortDir;
+    }
+    if (typeof av === 'string') return av.localeCompare(bv, 'ja') * sortDir;
+    return (av - bv) * sortDir;
+  });
+  buildHeader();
+  renderRows(filteredRows);
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+async function exportCSV() {
+  try {
+    const date = document.getElementById('date-picker').value;
+    const res = await fetch(`${API}/api/export?date=${date}`);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `order_analysis_${date}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('エラー: ' + e.message); }
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    if (btn.textContent.includes(name === 'analysis' ? '発注分析' : 'データ確認'))
+      btn.classList.add('active');
+  });
+  if (name === 'status' && !statusLoaded) loadStatus();
+}
+
+let statusLoaded = false;
+
+// ── Status page data loading ──────────────────────────────────────────────────
+async function loadStatus() {
+  try {
+    const res = await fetch(`${API}/api/status`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    statusLoaded = true;
+    renderStatusKPIs(data.summary);
+    renderRunHistory(data.pipeline_runs);
+    renderQualityChecks(data.quality_reports);
+    renderTableCounts(data.table_counts);
+  } catch(e) {
+    console.error('Status load failed:', e);
+  }
+}
+
+function renderStatusKPIs(s) {
+  const total = s.runs_last_7d || 0;
+  const failures = s.failures_last_7d || 0;
+  const rate = total > 0 ? Math.round((total - failures) / total * 100) : 0;
+  document.getElementById('sk-success-rate').textContent = rate + '%';
+  document.getElementById('sk-failures').textContent = failures;
+  document.getElementById('sk-last-run').textContent = s.last_run_date || '-';
+  const statusEl = document.getElementById('sk-last-status');
+  statusEl.textContent = s.last_run_status === 'success' ? '正常完了' : s.last_run_status === 'failed' ? '失敗' : '-';
+  statusEl.style.color = s.last_run_status === 'success' ? '#16a34a' : '#dc2626';
+  document.getElementById('sk-skus').textContent = fmt(s.total_skus);
+}
+
+function renderRunHistory(runs) {
+  const tbody = document.getElementById('run-history-body');
+  let html = '';
+  runs.forEach((run, idx) => {
+    const ok = run.status === 'success';
+    const badge = ok
+      ? '<span class="badge badge-OK">成功</span>'
+      : '<span class="badge badge-CRITICAL">失敗</span>';
+    const dur = _fmtDuration(run.total_ms);
+    const completedSteps = run.steps.filter(s => s.status === 'success').length;
+    const totalSteps = 6;
+    const startTime = run.started_at ? run.started_at.slice(11, 16) + ' UTC' : '-';
+
+    html += `<tr style="cursor:pointer" onclick="toggleSteps('steps-${idx}')">
+      <td><strong>${run.run_date}</strong></td>
+      <td>${badge}</td>
+      <td style="font-family:Consolas,monospace">${dur}</td>
+      <td>${completedSteps} / ${totalSteps}</td>
+      <td style="color:#9ca3af;font-size:12px">${startTime}</td>
+      <td style="color:#b0b8c9;font-size:11px">▶ 詳細</td>
+    </tr>
+    <tr class="steps-row" id="steps-${idx}" style="display:none">
+      <td colspan="6">
+        <div class="steps-grid">
+          ${_renderStepCells(run.steps)}
+        </div>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function _renderStepCells(steps) {
+  const ALL_STEPS = [
+    ['extract_zozo_sales',         'ZOZO 販売取得'],
+    ['extract_zozo_inventory',     'ZOZO 在庫取得'],
+    ['extract_sheets_reservations','Sheets 予約'],
+    ['extract_cost_excel',         '原価マスター'],
+    ['sync_product_master',        '商品マスター'],
+    ['rebuild_kpi_mart',           'KPI マート'],
+  ];
+  const stepMap = {};
+  steps.forEach(s => stepMap[s.step] = s);
+
+  return ALL_STEPS.map(([key, label]) => {
+    const s = stepMap[key];
+    if (!s) {
+      return `<div class="step-cell step-skip">
+        <div class="step-label">${label}</div>
+        <div class="step-rows" style="color:#ccc">スキップ</div>
+      </div>`;
+    }
+    const cls = s.status === 'success' ? 'step-ok' : 'step-fail';
+    const rowsTxt = s.rows > 0 ? `${fmt(s.rows)} 件` : (s.status === 'success' ? '完了' : '');
+    const durTxt = _fmtDuration(s.duration_ms);
+    const errTxt = s.error_message ? `<div class="step-err">${s.error_message}</div>` : '';
+    return `<div class="step-cell ${cls}">
+      <div class="step-label">${label}</div>
+      <div class="step-rows">${rowsTxt}</div>
+      <div class="step-dur">${durTxt}</div>
+      ${errTxt}
+    </div>`;
+  }).join('');
+}
+
+function toggleSteps(id) {
+  const row = document.getElementById(id);
+  if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+}
+
+function renderQualityChecks(reports) {
+  document.getElementById('quality-date-label').textContent =
+    reports.length ? '対象日: ' + reports[0].run_date : '';
+
+  const grid = document.getElementById('quality-grid');
+  grid.innerHTML = reports.map(r => {
+    const passIcon = '<span style="color:#16a34a;font-size:13px">✓</span>';
+    const failIcon = '<span style="color:#dc2626;font-size:13px">✗</span>';
+    const overallBadge = r.passed
+      ? '<span class="badge badge-OK">全チェック通過</span>'
+      : `<span class="badge badge-CRITICAL">${r.failed_checks}件失敗</span>`;
+
+    const checkRows = r.checks.map(c => {
+      const icon = c.passed ? passIcon : failIcon;
+      return `<div class="quality-check-row ${c.passed ? '' : 'qc-fail'}">
+        <span class="qc-icon">${icon}</span>
+        <span class="qc-name">${c.check_name}</span>
+        <span class="qc-msg">${c.message}</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="quality-card">
+      <div class="quality-card-header">
+        <div>
+          <div class="ds-name">${r.label}</div>
+          <div class="ds-rows">${fmt(r.row_count)} 件 / ${r.total_checks} チェック</div>
+        </div>
+        ${overallBadge}
+      </div>
+      <div class="quality-checks-list">${checkRows}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTableCounts(counts) {
+  const grid = document.getElementById('table-counts-grid');
+  const layerColor = {
+    'raw_layer':       '#f59e0b',
+    'analytics_layer': '#3b82f6',
+    'mart_layer':      '#8b5cf6',
+  };
+  grid.innerHTML = counts.map(c => {
+    const color = layerColor[c.dataset] || '#6b7280';
+    return `<div class="tc-card">
+      <div>
+        <div class="tc-name" style="color:${color};font-weight:700">${c.table}</div>
+        <div class="tc-dataset">${c.dataset}</div>
+      </div>
+      <div class="tc-count">${fmt(c.row_count)}</div>
+    </div>`;
+  }).join('');
+}
+
+function _fmtDuration(ms) {
+  if (!ms) return '-';
+  if (ms < 1000) return ms + 'ms';
+  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  return Math.floor(ms / 60000) + 'm ' + Math.round((ms % 60000) / 1000) + 's';
+}
+
+// ── Simulation modal ──────────────────────────────────────────────────────────
+let _simData = null;
+let _simSku  = null;
+let _simCustomQty = null;
+
+async function openSim(skuCode) {
+  _simSku = skuCode;
+  _simCustomQty = null;
+  document.getElementById('sim-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('sim-loading').style.display = 'block';
+  document.getElementById('sim-content').style.display = 'none';
+  await _runSim(skuCode, null);
+}
+
+async function _runSim(skuCode, orderQty) {
+  try {
+    const body = { sku_code: skuCode };
+    if (orderQty !== null) body.order_qty = orderQty;
+    const res = await fetch('/api/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    _simData = await res.json();
+    _renderSim();
+  } catch(e) {
+    document.getElementById('sim-loading').textContent = 'エラー: ' + e.message;
+  }
+}
+
+function closeSim() {
+  document.getElementById('sim-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function onSimOverlayClick(e) {
+  if (e.target === document.getElementById('sim-overlay')) closeSim();
+}
+
+function _renderSim() {
+  const d = _simData;
+  if (!d) return;
+
+  document.getElementById('sim-panel-subtitle').textContent =
+    `${d.product_code} / ${d.color_name} / ${d.size}`;
+
+  const cur = d.current;
+  const fmtYen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
+  const fmtPct = n => n == null ? '-' : (n * 100).toFixed(1) + '%';
+  const fmtDays = n => n == null ? '-' : Math.round(n) + '日';
+
+  const URGBADGE = {
+    CRITICAL: '<span class="badge badge-CRITICAL">欠品</span>',
+    WARNING:  '<span class="badge badge-WARNING">警告</span>',
+    OK:       '<span class="badge badge-OK">OK</span>',
+    OVERSTOCK:'<span class="badge badge-OVERSTOCK">過剰在庫</span>',
+  };
+
+  // Snapshot section
+  const snapHTML = `
+    <div class="sim-section">
+      <div class="sim-section-label">現在のSKU状況</div>
+      <div class="sim-snapshot-grid">
+        <div class="sim-snap-item"><span>フリー在庫</span><span>${fmt(cur.free_inventory)} 枚</span></div>
+        <div class="sim-snap-item"><span>日販 (30d)</span><span>${cur.daily_velocity_30d.toFixed(1)} 枚/日</span></div>
+        <div class="sim-snap-item"><span>トレンド係数</span><span>${cur.trend_coefficient.toFixed(2)}</span></div>
+        <div class="sim-snap-item"><span>在庫日数</span><span>${fmtDays(cur.stock_days_7d)}</span></div>
+        <div class="sim-snap-item"><span>原価</span><span>${fmtYen(cur.cost_price)}</span></div>
+        <div class="sim-snap-item"><span>売価</span><span>${fmtYen(cur.retail_price)}</span></div>
+        <div class="sim-snap-item"><span>粗利率</span><span>${fmtPct(cur.gross_margin_pct)}</span></div>
+        <div class="sim-snap-item"><span>推奨発注数</span><span>${fmt(cur.recommended_order_qty)} 枚</span></div>
+      </div>
+      <div style="margin-top:10px">${URGBADGE[cur.order_urgency] || cur.order_urgency}</div>
+    </div>`;
+
+  // Scenario card builder
+  function scenarioCard(sc, label, isRec) {
+    const stockoutTxt = sc.stockout_week ? `第${sc.stockout_week}週` : '12週内なし';
+    const stockoutCls = sc.stockout_week ? 'stockout' : 'ok';
+    const profitCls   = sc.gross_profit >= 0 ? 'profit-pos' : 'profit-neg';
+    const recBadge    = isRec ? '<div class="sim-card-rec-badge">推奨</div>' : '';
+    return `<div class="sim-card${isRec ? ' recommended' : ''}">
+      ${recBadge}
+      <div class="sim-card-title">${sc.label}</div>
+      <div class="sim-card-desc">${sc.description}</div>
+      <div class="sim-card-metrics">
+        <span class="ml">発注数</span><span class="mr">${fmt(sc.order_qty)} 枚</span>
+        <span class="ml">在庫カバー</span><span class="mr">${sc.target_days > 0 ? sc.target_days+'日' : '-'}</span>
+        <span class="ml">欠品予測</span><span class="mr ${stockoutCls}">${stockoutTxt}</span>
+        <span class="ml">発注コスト</span><span class="mr">${fmtYen(sc.total_cost)}</span>
+        <span class="ml">予想粗利</span><span class="mr ${profitCls}">${fmtYen(sc.gross_profit)}</span>
+        <span class="ml">粗利率</span><span class="mr">${fmtPct(sc.margin_pct)}</span>
+      </div>
+    </div>`;
+  }
+
+  const scenariosHTML = `
+    <div class="sim-section">
+      <div class="sim-section-label">シナリオ比較</div>
+      <div class="sim-scenarios">
+        ${scenarioCard(d.scenarios.conservative, '安全発注', false)}
+        ${scenarioCard(d.scenarios.balanced,     '推奨発注', true)}
+        ${scenarioCard(d.scenarios.aggressive,   '積極発注', false)}
+      </div>
+    </div>`;
+
+  // Chart
+  const proj = d.weekly_projections;
+  const allVals = proj.flatMap(p => [p.stock_without_order, p.stock_aggressive]);
+  const maxV = Math.max(...allVals, 1);
+  const minV = Math.min(...allVals, 0);
+  const range = maxV - minV || 1;
+  const toY = v => ((maxV - v) / range * 100);
+
+  const LINES = [
+    { key: 'stock_without_order', color: '#9CA3AF', dash: '3,2', label: '発注なし' },
+    { key: 'stock_conservative',  color: '#F59E0B', dash: '',    label: '安全発注' },
+    { key: 'stock_balanced',      color: '#6366F1', dash: '',    label: '推奨発注' },
+    { key: 'stock_aggressive',    color: '#10B981', dash: '',    label: '積極発注' },
+  ];
+
+  const legendHTML = LINES.map(l =>
+    `<span><span class="dot" style="background:${l.color};border-top:${l.dash?'2px dashed '+l.color:'none'}"></span>${l.label}</span>`
+  ).join('');
+
+  const polylines = LINES.map(l => {
+    const pts = proj.map((p, i) =>
+      `${(i/(proj.length-1)*100).toFixed(1)},${toY(p[l.key]).toFixed(1)}`
+    ).join(' ');
+    return `<polyline points="${pts}" fill="none" stroke="${l.color}" stroke-width="1.8"
+      ${l.dash ? `stroke-dasharray="${l.dash}"` : ''} vector-effect="non-scaling-stroke"/>`;
+  }).join('');
+
+  const zeroY = toY(0);
+  const zeroLine = minV < 0 ? `<line x1="0" y1="${zeroY.toFixed(1)}" x2="100" y2="${zeroY.toFixed(1)}" stroke="#EF4444" stroke-width="0.5" stroke-dasharray="2,1"/>` : '';
+
+  const weekLabels = [1,4,8,12].map(w =>
+    `<text x="${((w-1)/11*100).toFixed(1)}" y="78" font-size="4" fill="#9CA3AF" text-anchor="middle">W${w}</text>`
+  ).join('');
+
+  const chartHTML = `
+    <div class="sim-section" id="sim-chart-wrap">
+      <div class="sim-section-label">在庫推移グラフ（12週間予測）</div>
+      <div class="sim-chart-legend">${legendHTML}</div>
+      <svg viewBox="0 0 100 80" preserveAspectRatio="none">
+        ${zeroLine}${polylines}${weekLabels}
+      </svg>
+      <p style="font-size:11px;color:#9ca3af;margin-top:6px">※ 赤破線 = 在庫ゼロライン。線が下を下回ると欠品状態。</p>
+    </div>`;
+
+  // Custom qty
+  const customQtyHTML = `
+    <div class="sim-section">
+      <div class="sim-section-label">カスタム発注数でシミュレーション</div>
+      <div class="sim-custom">
+        <input type="number" id="sim-qty-input" min="0" value="${_simCustomQty ?? cur.recommended_order_qty}"
+          placeholder="発注数を入力" onkeydown="if(event.key==='Enter')rerunSim()"/>
+        <button class="btn btn-primary" onclick="rerunSim()">再計算</button>
+        <span style="font-size:12px;color:#9ca3af">推奨: ${fmt(cur.recommended_order_qty)} 枚</span>
+      </div>
+    </div>`;
+
+  const content = document.getElementById('sim-content');
+  content.innerHTML = snapHTML + scenariosHTML + chartHTML + customQtyHTML;
+  document.getElementById('sim-loading').style.display = 'none';
+  content.style.display = 'flex';
+  content.style.flexDirection = 'column';
+  content.style.gap = '14px';
+}
+
+async function rerunSim() {
+  const input = document.getElementById('sim-qty-input');
+  const qty = parseInt(input.value, 10);
+  if (isNaN(qty) || qty < 0) { alert('0以上の整数を入力してください'); return; }
+  _simCustomQty = qty;
+  document.getElementById('sim-loading').style.display = 'block';
+  document.getElementById('sim-content').style.display = 'none';
+  await _runSim(_simSku, qty);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeMatrix(); closeSim(); }
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Set date picker to today
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('date-picker').value = today;
+  document.getElementById('header-sub').textContent = `${today} — ローカルデモ`;
+  buildHeader();
+  loadData();
+});
+</script>
+</body>
+</html>

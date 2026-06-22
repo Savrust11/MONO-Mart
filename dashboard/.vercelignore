@@ -1,0 +1,20 @@
+# 機密は絶対にアップロードしない（Vercelの環境変数で設定する）
+.env
+.env.*
+*.key
+*sa-key*.json
+*service-account*.json
+*credentials*.json
+
+# ビルド成果物・依存（Vercel側で再生成）
+.next
+node_modules
+out
+
+# スクラッチ・ログ
+_*.js
+_*.ts
+_*.py
+_*.txt
+*.log
+tsconfig.tsbuildinfo

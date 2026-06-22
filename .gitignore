@@ -1,0 +1,61 @@
+# ───────── 機密（絶対に公開しない）─────────
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
+*sa-key*.json
+*service-account*.json
+*credentials*.json
+*.pem
+*.key
+*.p12
+secrets/
+**/sheets-sa-key.json*
+secrets.local.ps1
+**/secrets.local.ps1
+
+# 認証後HTMLキャプチャ（セッション情報混入の恐れ）
+pipeline/scrapers/html/
+
+# セッション状態（ライブcookie/token）・認証画面スクショ・デバッグ生成物
+**/sessions/
+*_state.json
+sessions/
+
+# ───────── 依存・ビルド成果物 ─────────
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# ───────── 顧客データ・大容量データ（機密＋容量。GitHubに載せない）─────────
+*.xlsx
+*.csv
+*.pdf
+ZOZO買い回りデータ/
+exports/
+uploads/
+data/
+*.parquet
+
+# ───────── ログ・一時・スクラッチ ─────────
+*.log
+logs/
+_*.js
+_*.ts
+_*.py
+_*.txt
+tmp/
+.DS_Store
+Thumbs.db
+
+# ───────── エディタ/ローカル ─────────
+.claude/
+.vscode/*
+!.vscode/settings.json

@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg:        #f7f8fa;
+    --color-surface:   #ffffff;
+    --color-border:    #e5e7eb;
+    --color-text:      #111827;
+    --color-text-sub:  #6b7280;
+    --color-primary:   #4f46e5;
+    --color-primary-h: #4338ca;
+  }
+
+  html, body {
+    height: 100%;
+  }
+
+  body {
+    @apply text-gray-900 bg-gray-50;
+    font-family: 'Noto Sans JP', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN',
+                 'Yu Gothic', Meiryo, system-ui, -apple-system, sans-serif;
+    font-feature-settings: "palt" 1;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Scrollbars */
+  ::-webkit-scrollbar       { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* Tables compact */
+  table { font-size: 12px; }
+
+  .sticky-cols th:nth-child(-n+3),
+  .sticky-cols td:nth-child(-n+3) {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background: inherit;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white border border-gray-200 rounded-xl shadow-sm;
+  }
+  .card-hover {
+    @apply transition-all hover:border-indigo-300 hover:shadow-md;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-medium
+           rounded-lg shadow-sm hover:bg-indigo-700 transition-colors disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-300
+           text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors;
+  }
+  .pill {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full;
+  }
+}
+
+@layer utilities {
+  .font-mono { font-family: 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace; }
+  .gradient-indigo {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%);
+  }
+  .gradient-text-indigo {
+    background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
