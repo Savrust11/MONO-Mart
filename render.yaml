@@ -1,0 +1,42 @@
+# Render Blueprint — MONO BACK OFFICE dashboard (Next.js, Docker)
+# Deploy: Render Dashboard → New → Blueprint → connect this repo.
+# NOTE: the GCP service-account key is NOT in this file. Add it in the Render
+#       service UI as a Secret File named "sheets-sa-key.json" (mounted at
+#       /etc/secrets/sheets-sa-key.json). Set MANUS_API_KEY there too.
+services:
+  - type: web
+    name: mono-back-office-dashboard
+    runtime: docker
+    repo: https://github.com/Savrust11/MONO-Mart
+    branch: main
+    rootDir: dashboard
+    dockerfilePath: ./Dockerfile
+    region: singapore
+    plan: starter
+    healthCheckPath: /dashboard
+    envVars:
+      - key: GCP_PROJECT_ID
+        value: mono-back-office-system
+      - key: BQ_DATASET_RAW
+        value: raw_layer
+      - key: BQ_DATASET_ANALYTICS
+        value: analytics_layer
+      - key: BQ_DATASET_MART
+        value: mart_layer
+      - key: BQ_DATASET_MONITORING
+        value: monitoring
+      - key: BQ_LOCATION
+        value: asia-northeast1
+      - key: SHEETS_OUTPUT_ID
+        value: 1DX9992gHjYk5FI5u2sYmPeseH7A5XeHX4z9yVxo-97Q
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: /etc/secrets/sheets-sa-key.json
+      - key: MANUS_API_BASE_URL
+        value: https://api.manus.space
+      - key: MANUS_API_KEY
+        sync: false
+      # Basic 認証（顧客のみアクセス可）。値は Render UI で設定。
+      - key: BASIC_AUTH_USER
+        sync: false
+      - key: BASIC_AUTH_PASS
+        sync: false

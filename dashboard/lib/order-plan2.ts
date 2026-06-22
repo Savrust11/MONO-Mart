@@ -77,21 +77,33 @@ function enumMonths(days: string[]): string[] {
   const set = new Set<string>(); for (const d of days) set.add(d.slice(0, 7));
   return [...set].sort();
 }
+// end の月から monthsBack ヶ月さかのぼった月初を返す（#6 月次レンジ用）。
+function monthStartIso(end: string, monthsBack: number): string {
+  const [y, m] = end.split('-').map(Number);
+  return new Date(Date.UTC(y, (m - 1) - (monthsBack - 1), 1)).toISOString().slice(0, 10);
+}
 
 export async function fetchPlan2(pc: string, start: string, end: string): Promise<Plan2> {
-  const days = enumDays(start, end);
-  const months = enumMonths(days);
+  // #6 月次/日次は別レンジ（顧客スプシ準拠）: 月次=長期・日次=短期。
+  //    既定 月次=直近MONTHLY_MONTHSヶ月 / 日次=直近DAILY_DAYS日（end起点）。正式な遡及幅は顧客確認後に調整。
+  const MONTHLY_MONTHS = 12, DAILY_DAYS = 31;
+  const dailyStart = addDays(end, -(DAILY_DAYS - 1));
+  const monthlyStart = monthStartIso(end, MONTHLY_MONTHS);
+  const fetchStart = monthlyStart < dailyStart ? monthlyStart : dailyStart; // 取得は広い方（=月次）に合わせる
+  const allDays = enumDays(fetchStart, end);   // 取得・月次集計の母集合
+  const days = enumDays(dailyStart, end);      // 日次の表示列（短期）
+  const months = enumMonths(allDays);          // 月次の表示列（長期）
 
   const [ordRows, uuRows, costRows, incRows, stkRows, cdaysRows, exclRows, pivRows] = await Promise.all([
     // 日次 受注（販売数/売上/上代/予約販売数）
     q(`SELECT CAST(sale_date AS STRING) d, SUM(sales_quantity) qty, SUM(sales_amount) rev,
          SUM(proper_price*sales_quantity) lst, SUM(IF(sale_type LIKE '%予約%', sales_quantity, 0)) yqty
        FROM ${T('sales_daily')} WHERE product_code=@pc AND source_file='orders'
-         AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d`, { pc, sd: start, ed: end }),
+         AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d`, { pc, sd: fetchStart, ed: end }),
     // 日次 UU/お気に入り（商品別実績(新)＝source_file 指定なしで合算）
     q(`SELECT CAST(sale_date AS STRING) d, SUM(unique_visitors) uu, SUM(favorites) fav
        FROM ${T('sales_daily')} WHERE product_code=@pc
-         AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d`, { pc, sd: start, ed: end }),
+         AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d`, { pc, sd: fetchStart, ed: end }),
     // 日次 原価（粗利率用）: SKU別販売×最新評価額
     q(`WITH s AS (SELECT CAST(sale_date AS STRING) d, UPPER(TRIM(sku_code)) sk, SUM(sales_quantity) qty
                   FROM ${T('sales_daily')} WHERE product_code=@pc AND source_file='orders'
@@ -99,7 +111,7 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
             c AS (SELECT UPPER(TRIM(sku_code)) sk, ANY_VALUE(valuation_price) vp FROM ${T('cost_master')}
                   WHERE product_code=@pc GROUP BY sk)
        SELECT s.d, SUM(s.qty*COALESCE(c.vp,0)) cost FROM s LEFT JOIN c ON c.sk=s.sk GROUP BY s.d`,
-      { pc, sd: start, ed: end }),
+      { pc, sd: fetchStart, ed: end }),
     // 入荷数量（着日別・最新スナップショット）
     q(`SELECT CAST(SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE) AS STRING) d, SUM(incoming_qty) q
        FROM ${T('incoming_stock')} WHERE product_code=@pc AND earliest_arrival_date IS NOT NULL
@@ -108,7 +120,7 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
     // 在庫（当時・日次スナップショット）
     q(`SELECT CAST(snapshot_date AS STRING) d, SUM(available_qty) s FROM ${T('stock_analysis')}
        WHERE product_code=@pc AND snapshot_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d`,
-      { pc, sd: start, ed: end }),
+      { pc, sd: fetchStart, ed: end }),
     // クーポン実施日（ショップ単位）
     q(`SELECT DISTINCT CAST(exclusion_date AS STRING) d FROM ${T('coupon_exclusion')}
        WHERE brand_name=(SELECT ANY_VALUE(shop_name) FROM ${T('product_master')}
@@ -121,7 +133,7 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
          CAST(sale_date AS STRING) d, SUM(sales_quantity) q
        FROM ${T('sales_daily')} WHERE product_code=@pc AND source_file='orders'
          AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) AND sales_quantity>0
-       GROUP BY sk, d`, { pc, sd: start, ed: end }),
+       GROUP BY sk, d`, { pc, sd: fetchStart, ed: end }),
   ]);
 
   // 日次マップ化
@@ -139,7 +151,7 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
   // 日次の成分（分子分母）
   type Comp = { qty: number; rev: number; lst: number; cost: number; uu: number; fav: number; yqty: number; cp: number; inc: number; stk: number | null };
   const comp: Record<string, Comp> = {};
-  for (const d of days) {
+  for (const d of allDays) {
     const o = ord[d] ?? { qty: 0, rev: 0, lst: 0, yqty: 0 };
     const u = uu[d] ?? { uu: 0, fav: 0 };
     const isCP = cdays.has(d) && !excl.has(d);
@@ -173,7 +185,7 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
   ];
 
   const daysByMonth: Record<string, string[]> = {};
-  for (const d of days) (daysByMonth[d.slice(0, 7)] ??= []).push(d);
+  for (const d of allDays) (daysByMonth[d.slice(0, 7)] ??= []).push(d);
 
   const metrics: Plan2Metric[] = metricDefs.map((m) => ({
     key: m.key, label: m.label, format: m.format,
@@ -196,7 +208,7 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
     .sort((a, b) => (a.color_name ?? '').localeCompare(b.color_name ?? '') || (a.size ?? '').localeCompare(b.size ?? ''));
 
   return {
-    product_code: pc, start, end, months, days, metrics, skuPivot,
-    note: days.length > 120 ? `日次列が${days.length}日と長いため横スクロールします。` : '',
+    product_code: pc, start: fetchStart, end, months, days, metrics, skuPivot,
+    note: `月次=直近${months.length}ヶ月 / 日次=直近${days.length}日（別レンジ）`,
   };
 }

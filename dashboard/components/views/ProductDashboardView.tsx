@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Package, TrendingUp, Percent, Coins } from 'lucide-react';
 import { Plan1View } from './Plan1View';
 import { Plan2View } from './Plan2View';
+import { LoadingProgress } from '../LoadingProgress';
 
 type Tab = 'plan1' | 'plan2' | 'detail';
 
@@ -29,6 +30,7 @@ export function ProductDashboardView({ code }: { code: string }) {
   const [end, setEnd] = useState(isoDaysAgo(0));
   const [rows, setRows] = useState<Row[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false); // 進捗バー表示（完了アニメ含む）
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('plan1');
   // BO入力: 集計する実績期間の3択 + 想定の販売期間 + 総数指定
@@ -50,7 +52,7 @@ export function ProductDashboardView({ code }: { code: string }) {
     const eff = resolvePeriod();
     const total = Math.max(0, parseInt(totalQty, 10) || 0);
     setApplied({ ...eff, total });
-    setLoading(true); setError(null);
+    setBusy(true); setLoading(true); setError(null);
     try {
       const url = `/api/period-report?product_code=${encodeURIComponent(code)}&start=${eff.start}&end=${eff.end}`;
       const res = await fetch(url);
@@ -63,14 +65,16 @@ export function ProductDashboardView({ code }: { code: string }) {
   }, [code, resolvePeriod, totalQty]);
 
   const [sheetMsg, setSheetMsg] = useState<string | null>(null);
+  const [sheetUrl, setSheetUrl] = useState<string | null>(null);
   const toSheet = useCallback(async () => {
-    setSheetMsg('スプシ出力中…');
+    setSheetMsg('スプシ出力中…'); setSheetUrl(null);
     try {
       const res = await fetch(
         `/api/period-report/to-sheet?product_code=${encodeURIComponent(code)}&start=${applied.start}&end=${applied.end}`,
         { method: 'POST' });
       const j = await res.json();
-      setSheetMsg(res.ok ? `✓ スプレッドシートに出力しました（${j.rows}行）` : `エラー: ${j.error || '失敗'}`);
+      if (res.ok) { setSheetMsg(`✓ スプレッドシートに出力しました（${j.rows}行）`); setSheetUrl(j.url || null); }
+      else setSheetMsg(`エラー: ${j.error || '失敗'}`);
     } catch (e) {
       setSheetMsg('通信エラー: ' + String(e));
     }
@@ -166,7 +170,7 @@ export function ProductDashboardView({ code }: { code: string }) {
             {loading ? '照会中…' : '集計'}
           </button>
           {/* CSVは№13（出力＝スプシ）確定外のため非表示。APIは残置 */}
-          {tab === 'detail' && rows && (
+          {tab === 'detail' && !busy && rows && (
             <button onClick={toSheet}
               className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded text-sm">
               スプシ出力
@@ -174,7 +178,17 @@ export function ProductDashboardView({ code }: { code: string }) {
           )}
         </div>
       </div>
-      {sheetMsg && tab === 'detail' && <div className="text-xs text-gray-700 mb-3">{sheetMsg}</div>}
+      {tab === 'detail' && (sheetMsg || sheetUrl) && (
+        <div className="text-xs text-gray-700 mb-3 flex items-center gap-3">
+          {sheetMsg && <span>{sheetMsg}</span>}
+          {sheetUrl && (
+            <a href={sheetUrl} target="_blank" rel="noopener noreferrer"
+              className="text-teal-700 underline hover:text-teal-800 font-medium">
+              📊 スプレッドシートを開く
+            </a>
+          )}
+        </div>
+      )}
 
       {/* タブ切替（案1 / 項目詳細）※案2は実装予定 */}
       <div className="flex gap-1 border-b border-gray-200 mb-4">
@@ -186,12 +200,14 @@ export function ProductDashboardView({ code }: { code: string }) {
       {tab === 'plan1' && <Plan1View code={code} start={applied.start} end={applied.end} totalQty={applied.total} />}
       {tab === 'plan2' && <Plan2View code={code} start={applied.start} end={applied.end} />}
 
+      {tab === 'detail' && busy && <LoadingProgress active={loading} label="項目詳細を集計中" onDone={() => setBusy(false)} />}
+
       {error && (
         <div className="bg-rose-50 border border-rose-200 rounded p-3 text-xs text-rose-700 mb-4">{error}</div>
       )}
 
       {/* KPI */}
-      {tab === 'detail' && rows && (
+      {tab === 'detail' && !busy && rows && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <Kpi label="合計販売数" value={pick('合計販売数')} unit="点" icon={Package} color="indigo" />
           <Kpi label="平均売価(税抜)" value={pick('平均売価（税抜）')} unit="円" icon={Coins} color="blue" />
@@ -201,7 +217,7 @@ export function ProductDashboardView({ code }: { code: string }) {
       )}
 
       {/* 全項目テーブル */}
-      {tab === 'detail' && rows && (
+      {tab === 'detail' && !busy && rows && (
         <div className="bg-white border border-gray-200 rounded overflow-hidden">
           <table className="w-full text-[13px]">
             <tbody>

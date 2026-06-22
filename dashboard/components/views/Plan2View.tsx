@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { LoadingProgress } from '../LoadingProgress';
 
 type MetricFormat = 'int' | 'yen' | 'pct';
 interface Plan2Metric { key: string; label: string; format: MetricFormat; monthly: (number | null)[]; daily: (number | null)[]; }
@@ -22,21 +23,24 @@ const md = (d: string) => d.slice(5); // 'MM-DD'
 export function Plan2View({ code, start, end }: { code: string; start: string; end: string }) {
   const [data, setData] = useState<Plan2 | null>(null);
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false); // 進捗バー表示（完了アニメ含む）
   const [error, setError] = useState<string | null>(null);
   const [grain, setGrain] = useState<'monthly' | 'daily'>('monthly');
   const [outMsg, setOutMsg] = useState<string | null>(null);
+  const [outUrl, setOutUrl] = useState<string | null>(null);
 
   const toSheet = useCallback(async () => {
-    setOutMsg('スプシ出力中…');
+    setOutMsg('スプシ出力中…'); setOutUrl(null);
     try {
       const res = await fetch(`/api/order-plan2/to-sheet?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}`, { method: 'POST' });
       const j = await res.json();
-      setOutMsg(res.ok ? `✓ スプレッドシート「案2」タブに出力しました（${j.rows}行）` : `エラー: ${j.error || '失敗'}`);
+      if (res.ok) { setOutMsg(`✓ スプレッドシート「案2」タブに出力しました（${j.rows}行）`); setOutUrl(j.url || null); }
+      else setOutMsg(`エラー: ${j.error || '失敗'}`);
     } catch (e) { setOutMsg('通信エラー: ' + String(e)); }
   }, [code, start, end]);
 
   const run = useCallback(async () => {
-    setLoading(true); setError(null);
+    setBusy(true); setLoading(true); setError(null);
     try {
       const res = await fetch(`/api/order-plan2?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}`);
       const j = await res.json();
@@ -47,7 +51,7 @@ export function Plan2View({ code, start, end }: { code: string; start: string; e
   }, [code, start, end]);
   useEffect(() => { run(); }, [run]);
 
-  if (loading) return <div className="p-6 text-sm text-gray-500">案2を集計中…</div>;
+  if (busy) return <LoadingProgress active={loading} label="案2（時系列）を集計中" onDone={() => setBusy(false)} />;
   if (error) return <div className="m-4 bg-rose-50 border border-rose-200 rounded p-3 text-xs text-rose-700">{error}</div>;
   if (!data) return null;
 
@@ -75,6 +79,12 @@ export function Plan2View({ code, start, end }: { code: string; start: string; e
             スプシ出力
           </button>
           {outMsg && <span className="text-[11px] text-gray-700">{outMsg}</span>}
+          {outUrl && (
+            <a href={outUrl} target="_blank" rel="noopener noreferrer"
+              className="text-[11px] text-teal-700 underline hover:text-teal-800 font-medium">
+              📊 スプレッドシートを開く
+            </a>
+          )}
         </div>
       </div>
 

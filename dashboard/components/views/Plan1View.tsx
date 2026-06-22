@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { LoadingProgress } from '../LoadingProgress';
 
 // 発注管理表「案1」= SKU別明細ビュー。/api/order-plan1 のレスポンス型。
 interface Plan1Sku {
@@ -39,22 +40,27 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
   { code: string; start: string; end: string; totalQty?: number }) {
   const [data, setData] = useState<Plan1 | null>(null);
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false); // 進捗バー表示（完了アニメ含む）
   const [error, setError] = useState<string | null>(null);
   // 仕様: SKUに「集計不要」チェックがある。既定は全集計、チェックで除外。
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [outMsg, setOutMsg] = useState<string | null>(null);
+  const [outUrl, setOutUrl] = useState<string | null>(null);
+  // #1 確定発注数: 手入力欄（SKU品番ごと）。既定は空欄、未入力時は推奨発注数をプレースホルダ表示。
+  const [confirmed, setConfirmed] = useState<Record<string, string>>({});
 
   const toSheet = useCallback(async () => {
-    setOutMsg('スプシ出力中…');
+    setOutMsg('スプシ出力中…'); setOutUrl(null);
     try {
       const res = await fetch(`/api/order-plan1/to-sheet?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}`, { method: 'POST' });
       const j = await res.json();
-      setOutMsg(res.ok ? `✓ スプレッドシート「案1」タブに出力しました（${j.rows}行）` : `エラー: ${j.error || '失敗'}`);
+      if (res.ok) { setOutMsg(`✓ スプレッドシート「案1」タブに出力しました（${j.rows}行）`); setOutUrl(j.url || null); }
+      else setOutMsg(`エラー: ${j.error || '失敗'}`);
     } catch (e) { setOutMsg('通信エラー: ' + String(e)); }
   }, [code, start, end]);
 
   const run = useCallback(async () => {
-    setLoading(true); setError(null);
+    setBusy(true); setLoading(true); setError(null);
     try {
       const res = await fetch(
         `/api/order-plan1?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}`);
@@ -67,7 +73,7 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
 
   useEffect(() => { run(); }, [run]);
 
-  if (loading) return <div className="p-6 text-sm text-gray-500">案1を集計中…</div>;
+  if (busy) return <LoadingProgress active={loading} label="案1（SKU別明細）を集計中" onDone={() => setBusy(false)} />;
   if (error) return <div className="m-4 bg-rose-50 border border-rose-200 rounded p-3 text-xs text-rose-700">{error}</div>;
   if (!data) return null;
 
@@ -88,6 +94,21 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
       .forEach(({ i }) => { if (residual-- > 0) floor[i] += 1; });
     rows.forEach((s, i) => { alloc[s.sku_code ?? ''] = floor[i]; });
   }
+
+  // #3 入荷山を「日付ごと」に整列（左詰めをやめる）。全SKUの入荷予定日を集めて列に並べ、
+  //    各SKUの入荷数量を該当する日付列の下に配置する。
+  const arrivalDates: string[] = (() => {
+    const set = new Set<string>();
+    for (const s of rows) for (const dt of [s.arr1_date, s.arr2_date, s.arr3_date]) if (dt) set.add(dt);
+    return Array.from(set).sort();
+  })();
+  const arrQtyOf = (s: Plan1Sku, dt: string): number => {
+    let q = 0;
+    if (s.arr1_date === dt) q += s.arr1_qty ?? 0;
+    if (s.arr2_date === dt) q += s.arr2_qty ?? 0;
+    if (s.arr3_date === dt) q += s.arr3_qty ?? 0;
+    return q;
+  };
 
   return (
     <div className="p-4 space-y-4">
@@ -132,6 +153,12 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
           スプシ出力
         </button>
         {outMsg && <span className="text-[11px] text-gray-700">{outMsg}</span>}
+        {outUrl && (
+          <a href={outUrl} target="_blank" rel="noopener noreferrer"
+            className="text-[11px] text-teal-700 underline hover:text-teal-800 font-medium">
+            📊 スプレッドシートを開く
+          </a>
+        )}
       </div>
 
       <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
@@ -149,7 +176,7 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
               <th colSpan={4} className="px-2 py-1 border border-gray-200 bg-sky-100 text-center">▼直近7日</th>
               <th colSpan={4} className="px-2 py-1 border border-gray-200 bg-teal-100 text-center">▼直近30日</th>
               <th colSpan={3} className="px-2 py-1 border border-gray-200 bg-violet-100 text-center">フリー在庫・予約</th>
-              <th colSpan={6} className="px-2 py-1 border border-gray-200 bg-amber-100 text-center">入荷山</th>
+              <th colSpan={Math.max(1, arrivalDates.length)} className="px-2 py-1 border border-gray-200 bg-amber-100 text-center">入荷山（日付別）</th>
             </tr>
             <tr className="bg-gray-100 text-gray-600">
               <Th>集計不要</Th><Th>カラー</Th><Th>サイズ</Th><Th>SKU品番</Th><Th>上代</Th><Th>販売タイプ</Th>
@@ -160,9 +187,9 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
               <Th cls="bg-sky-50">7日販売数</Th><Th cls="bg-sky-50">日販平均</Th><Th cls="bg-sky-50">在庫日数</Th><Th cls="bg-sky-50">完売想定日</Th>
               <Th cls="bg-teal-50">30日販売数</Th><Th cls="bg-teal-50">日販中央値</Th><Th cls="bg-teal-50">在庫日数</Th><Th cls="bg-teal-50">完売想定日</Th>
               <Th cls="bg-violet-50">フリー在庫数</Th><Th cls="bg-violet-50">フリー在庫日数</Th><Th cls="bg-violet-50">予約未処理</Th>
-              <Th cls="bg-amber-50">入荷日1</Th><Th cls="bg-amber-50">入荷数</Th>
-              <Th cls="bg-amber-50">入荷日2</Th><Th cls="bg-amber-50">入荷数</Th>
-              <Th cls="bg-amber-50">入荷日3</Th><Th cls="bg-amber-50">入荷数</Th>
+              {arrivalDates.length === 0
+                ? <Th cls="bg-amber-50">入荷予定</Th>
+                : arrivalDates.map((dt) => <Th key={dt} cls="bg-amber-50">{d(dt)}</Th>)}
             </tr>
           </thead>
           <tbody>
@@ -178,7 +205,14 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
                 <Td num>{s.fku_share == null ? '—' : `${Math.round(s.fku_share * 100)}%`}</Td>
                 <Td>{d(s.last_order_date)}</Td><Td num>{n(s.last_cost)}</Td><Td num>{n(s.latest_avg_cost)}</Td>
                 <Td>{d(s.last_arrival_date)}</Td><Td num>{n(s.current_stock)}</Td>
-                <Td num cls="bg-indigo-50 font-semibold">{n(s.recommended_qty)}</Td><Td cls="bg-indigo-50">—</Td>
+                <Td num cls="bg-indigo-50 font-semibold">{n(s.recommended_qty)}</Td>
+                <Td cls="bg-indigo-50">
+                  <input type="number" min={0}
+                    value={confirmed[s.sku_code ?? ''] ?? ''}
+                    placeholder={s.recommended_qty != null ? String(s.recommended_qty) : ''}
+                    onChange={(e) => setConfirmed((p) => ({ ...p, [s.sku_code ?? '']: e.target.value }))}
+                    className="w-16 px-1 py-0.5 border border-gray-300 rounded text-right text-[12px]" />
+                </Td>
                 {totalQty > 0 && <Td num cls="bg-indigo-100 font-semibold">{n(alloc[s.sku_code ?? ''] ?? 0)}</Td>}
                 <Td num cls="bg-sky-50">{n(s.s7_qty)}</Td><Td num cls="bg-sky-50">{s.s7_daily_avg ?? '—'}</Td>
                 <Td num cls="bg-sky-50">{s.s7_stock_days == null ? '—' : `${s.s7_stock_days}日`}</Td><Td cls="bg-sky-50">{d(s.s7_sellout)}</Td>
@@ -187,9 +221,12 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
                 <Td num cls="bg-violet-50">{n(s.free_stock)}</Td>
                 <Td num cls="bg-violet-50">{s.free_stock_days == null ? '—' : `${s.free_stock_days}日`}</Td>
                 <Td num cls="bg-violet-50">{n(s.reserved_pending)}</Td>
-                <Td cls="bg-amber-50">{d(s.arr1_date)}</Td><Td num cls="bg-amber-50">{n(s.arr1_qty)}</Td>
-                <Td cls="bg-amber-50">{d(s.arr2_date)}</Td><Td num cls="bg-amber-50">{n(s.arr2_qty)}</Td>
-                <Td cls="bg-amber-50">{d(s.arr3_date)}</Td><Td num cls="bg-amber-50">{n(s.arr3_qty)}</Td>
+                {arrivalDates.length === 0
+                  ? <Td num cls="bg-amber-50">—</Td>
+                  : arrivalDates.map((dt) => {
+                      const q = arrQtyOf(s, dt);
+                      return <Td key={dt} num cls="bg-amber-50">{q > 0 ? n(q) : '—'}</Td>;
+                    })}
               </tr>
             ))}
           </tbody>
