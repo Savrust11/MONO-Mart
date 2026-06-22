@@ -59,3 +59,9 @@ Thumbs.db
 .claude/
 .vscode/*
 !.vscode/settings.json
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
