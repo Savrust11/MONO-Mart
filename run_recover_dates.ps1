@@ -1,6 +1,6 @@
 # =============================================================================
 # Backfill specific dates: re-fetch (orders,shipped) + re-ingest, to fix the
-# missing 販売数/金額. Idempotent: the BigQuery loader does DELETE+INSERT by
+# missing sales-qty/amount. Idempotent: the BigQuery loader does DELETE+INSERT by
 # sale_date, so re-running replaces partial data (no duplicates).
 #
 #   Default = the 4 dates the customer flagged:
