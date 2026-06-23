@@ -20,7 +20,7 @@
 #   The auto-fetched orders file for these days produced 0 rows (06-21 came back
 #   empty; 06-22's file did not parse). If the re-fetch below VERIFIES as FAILED
 #   (0 rows) for them, use the MANUAL-CSV path instead:
-#     1) In ZOZO BackOffice, download that day's 受注 CSV.
+#     1) In ZOZO BackOffice, download that day's orders (juchu) CSV.
 #     2) Upload it to:
 #          gs://mono-back-office-system-raw-data/uploads/zozo/orders/<DATE>/<yyyy_mm_dd>.csv
 #     3) Re-run only the ingest for that date:
