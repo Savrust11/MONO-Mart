@@ -29,7 +29,13 @@
 #
 # ASCII-only on purpose (Windows PowerShell 5.1 mis-parses non-ASCII .ps1).
 # =============================================================================
-param([string[]]$Dates = @("2026-05-23","2026-05-24","2026-06-21","2026-06-22"))
+param(
+  [string[]]$Dates = @("2026-05-23","2026-05-24","2026-06-21","2026-06-22"),
+  # Which ZOZO sources to re-fetch per date. Default = orders,shipped (fills
+  # sales-qty/amount/discount/margin/avg-price). To ALSO fill UU/CVR/fav-rate,
+  # add performance:  -Sources "orders,shipped,performance"
+  [string]$Sources = "orders,shipped"
+)
 
 $ErrorActionPreference = "Continue"
 $ROOT = "C:\Users\Administrator\Downloads\system"
@@ -54,10 +60,10 @@ if (-not $env:ZOZO_LOGIN_ID) { Log "FATAL: ZOZO credentials empty after secret f
 $results = @()
 Log ("===== BACKFILL START (day-level, all part numbers) dates=" + ($Dates -join ",") + " =====")
 foreach ($d in $Dates) {
-  # [1/3] re-fetch the WHOLE day (orders + shipped, every product) to GCS
-  Log "----- $d : [1/3] re-fetch (orders,shipped - full day, all products) -----"
+  # [1/3] re-fetch the WHOLE day (every product) to GCS, for the chosen sources
+  Log "----- $d : [1/3] re-fetch ($Sources - full day, all products) -----"
   $env:TARGET_DATE = $d
-  $env:ONLY = "orders,shipped"
+  $env:ONLY = $Sources
   & $PY (Join-Path $ROOT "pipeline\scrapers\zozo_scraper.py") 2>&1 | ForEach-Object { Log $_ }
   $fetchExit = $LASTEXITCODE
 

@@ -14,7 +14,12 @@
 #
 # ASCII-only on purpose (Windows PowerShell 5.1 mis-parses non-ASCII .ps1).
 # =============================================================================
-param([int]$Days = 60)
+param(
+  [int]$Days = 60,
+  # Sources to re-fetch per missing date. Default fills sales-qty/amount/etc.
+  # For max blank-fill (also UU/CVR/fav-rate): -Sources "orders,shipped,performance"
+  [string]$Sources = "orders,shipped"
+)
 
 $ErrorActionPreference = "Continue"
 $ROOT = "C:\Users\Administrator\Downloads\system"
@@ -47,8 +52,8 @@ if ($dates.Count -eq 0) {
 }
 
 # --- 2) upload exactly those dates ---
-Write-Output ("===== STEP 2: uploading " + $dates.Count + " missing date(s): " + ($dates -join ",") + " =====")
-& (Join-Path $ROOT "run_recover_dates.ps1") -Dates $dates
+Write-Output ("===== STEP 2: uploading " + $dates.Count + " missing date(s): " + ($dates -join ",") + " (sources=" + $Sources + ") =====")
+& (Join-Path $ROOT "run_recover_dates.ps1") -Dates $dates -Sources $Sources
 
 # --- 3) re-confirm ---
 Write-Output "===== STEP 3: re-check after upload ====="
