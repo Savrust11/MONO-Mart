@@ -195,10 +195,18 @@ class TableauExtractor:
             logger.warning("発注明細 Sheets CSV: empty")
             return []
 
+        # ヘッダの表記ゆれ対策: セル内改行(\n/\r)・前後空白を除去して突合する。
+        # 例) B列「入荷済み\nチェック」, AB列「単価(円)\n 税抜き」等、Sheets 由来の改行入りヘッダ。
+        # これが無いと idx("入荷済みチェック")=-1 となり、入荷済み行が除外されず入荷残が過大計上される。
+        def _norm(s: str) -> str:
+            return (s or "").replace("\r", "").replace("\n", "").strip()
+        norm_headers = [_norm(h) for h in headers]
+
         # Resolve column positions (positional because '発注数' is duplicated)
         def idx(name: str, start: int = 0) -> int:
-            for i in range(start, len(headers)):
-                if headers[i] == name:
+            target = _norm(name)
+            for i in range(start, len(norm_headers)):
+                if norm_headers[i] == target:
                     return i
             return -1
 
