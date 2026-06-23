@@ -113,6 +113,9 @@ def main() -> int:
     ap.add_argument("--end", default=None, help="YYYY-MM-DD (既定: 昨日 JST)")
     ap.add_argument("--min-rows", type=int, default=DEFAULT_MIN_ROWS)
     ap.add_argument("--frac", type=float, default=DEFAULT_FRAC)
+    ap.add_argument("--emit-dates", default=None,
+                    help="write the missing/low dates (one per line) to this file "
+                         "so a backfill wrapper can consume them")
     args = ap.parse_args()
 
     today_jst = datetime.now(JST).date()
@@ -149,6 +152,8 @@ def main() -> int:
     if not missing and not low:
         logger.info("OK: no gaps detected.")
         _record_monitoring(bq, end.isoformat(), "success", len(counts), None)
+        if args.emit_dates:
+            open(args.emit_dates, "w").close()  # empty -> wrapper uploads nothing
         return 0
 
     for ds in missing:
@@ -156,7 +161,10 @@ def main() -> int:
     for ds, r in low:
         logger.info("  LOW      %s : %d rows (< %d)", ds, r, low_threshold)
 
-    bad_dates = missing + [ds for ds, _ in low]
+    bad_dates = sorted(missing + [ds for ds, _ in low])
+    if args.emit_dates:
+        with open(args.emit_dates, "w") as fh:
+            fh.write("\n".join(bad_dates) + "\n")
     fix_list = ",".join(f'"{ds}"' for ds in bad_dates)
     fix_cmd = f"powershell -ExecutionPolicy Bypass -File run_recover_dates.ps1 -Dates {fix_list}"
     logger.info("--- to fix, run on the production server: ---")
