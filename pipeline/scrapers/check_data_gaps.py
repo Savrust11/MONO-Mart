@@ -60,8 +60,9 @@ DEFAULT_FRAC = 0.2      # 平常日の中央値に対する比率しきい値
 
 def _daily_order_counts(bq: bigquery.Client, start: date, end: date) -> dict[str, int]:
     """start..end の各 sale_date の orders 行数を返す (存在しない日はキー無し)。"""
+    # NB: `rows` is a reserved keyword in BigQuery -> alias must be n_rows.
     q = f"""
-      SELECT CAST(sale_date AS STRING) AS d, COUNT(*) AS rows
+      SELECT CAST(sale_date AS STRING) AS d, COUNT(*) AS n_rows
       FROM `{GCP_PROJECT_ID}.{BQ_DATASET_ANALYTICS}.sales_daily`
       WHERE source_file = 'orders'
         AND sale_date BETWEEN DATE(@s) AND DATE(@e)
@@ -71,7 +72,7 @@ def _daily_order_counts(bq: bigquery.Client, start: date, end: date) -> dict[str
         bigquery.ScalarQueryParameter("s", "STRING", start.isoformat()),
         bigquery.ScalarQueryParameter("e", "STRING", end.isoformat()),
     ])
-    return {r.d: r.rows for r in bq.query(q, job_config=cfg)}
+    return {r.d: r.n_rows for r in bq.query(q, job_config=cfg)}
 
 
 def _record_monitoring(bq: bigquery.Client, run_date: str, status: str, rows: int, msg: str | None) -> None:

@@ -32,8 +32,9 @@ def _day_totals(bq: bigquery.Client, date: str, product_code: str | None) -> dic
     if product_code:
         where += " AND UPPER(TRIM(product_code)) = UPPER(TRIM(@pc))"
         params.append(bigquery.ScalarQueryParameter("pc", "STRING", product_code))
+    # NB: `rows` is a reserved keyword in BigQuery -> alias must be n_rows.
     q = f"""
-      SELECT COUNT(*)                       AS rows,
+      SELECT COUNT(*)                       AS n_rows,
              IFNULL(SUM(sales_quantity), 0) AS qty,
              IFNULL(SUM(sales_amount), 0)   AS amount,
              COUNT(DISTINCT product_code)   AS products
@@ -42,7 +43,7 @@ def _day_totals(bq: bigquery.Client, date: str, product_code: str | None) -> dic
     """
     job = bq.query(q, job_config=bigquery.QueryJobConfig(query_parameters=params), location=LOC)
     r = list(job)[0]
-    return {"rows": r.rows, "qty": r.qty, "amount": r.amount, "products": r.products}
+    return {"rows": r.n_rows, "qty": r.qty, "amount": r.amount, "products": r.products}
 
 
 def main() -> int:
