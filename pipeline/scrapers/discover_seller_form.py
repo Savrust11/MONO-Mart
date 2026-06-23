@@ -52,17 +52,22 @@ def main() -> None:
         pg.goto(PAGE_URL, wait_until="domcontentloaded", timeout=45_000)
         pg.wait_for_timeout(1500)
 
+        # 出力は UTF-8 ファイルに直接書き出す（Windows コンソールの文字化け/エンコード回避）。
+        out: list[str] = []
+        def log(s: str = "") -> None:
+            out.append(s)
+
         base = dump_form(pg)
-        print("=" * 60)
-        print("Seller フォーム — 全 SELECT")
-        print("=" * 60)
+        log("=" * 60)
+        log("Seller フォーム — 全 SELECT")
+        log("=" * 60)
         for s in base["selects"]:
-            print(f"\nSELECT name={s['name']}  ({len(s['options'])} options)")
+            log(f"\nSELECT name={s['name']}  ({len(s['options'])} options)")
             for v, t in s["options"][:60]:
-                print(f"    value={v!r:>10}  : {t}")
-        print("\nRADIO groups:")
+                log(f"    value={v!r:>10}  : {t}")
+        log("\nRADIO groups:")
         for n, vals in base["radios"].items():
-            print(f"  {n}: {vals}")
+            log(f"  {n}: {vals}")
 
         # カスケード調査: 商品タイプ候補 select の最初の実値を選び、タイプ がどう変わるか観察
         candidates = ["SCategoryPID", "SCategoryID", "ItemTypeID", "GoodsTypeID", "CategoryID"]
@@ -72,12 +77,12 @@ def main() -> None:
                 continue
             nonzero = [v for v, _t in opts if v not in ("", "0")]
             if not nonzero:
-                print(f"\n[cascade] {fld}: 実値の選択肢なし（動的ロードの可能性）")
+                log(f"\n[cascade] {fld}: 実値の選択肢なし（動的ロードの可能性）")
                 continue
             pick = nonzero[0]
-            print("\n" + "=" * 60)
-            print(f"カスケード: {fld} = {pick} を選択 → 他 SELECT の変化")
-            print("=" * 60)
+            log("\n" + "=" * 60)
+            log(f"カスケード: {fld} = {pick} を選択 → 他 SELECT の変化")
+            log("=" * 60)
             try:
                 pg.select_option(f'select[name="{fld}"]', pick)
                 pg.wait_for_timeout(2000)
@@ -85,13 +90,20 @@ def main() -> None:
                 for s in after["selects"]:
                     if s["name"] in (fld, "ShopID"):
                         continue
-                    print(f"  SELECT {s['name']}: {len(s['options'])} -> {s['options'][:20]}")
+                    log(f"  SELECT {s['name']}: {len(s['options'])} -> {s['options'][:20]}")
             except Exception as e:
-                print(f"  cascade probe error: {e}")
+                log(f"  cascade probe error: {e}")
             break
 
         ctx.close()
         b.close()
+
+        text = "\n".join(out)
+        with open("seller_form_dump.txt", "w", encoding="utf-8") as f:
+            f.write(text)
+        # コンソールにも要約だけ（文字化けしても本体はファイルにある）
+        print(f"OK: {len(base['selects'])} selects / {len(base['radios'])} radio groups")
+        print("=> seller_form_dump.txt に保存しました（UTF-8）。このファイルの中身を送ってください。")
 
 
 if __name__ == "__main__":
