@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Package, TrendingUp, Percent, Coins } from 'lucide-react';
 import { Plan1View } from './Plan1View';
 import { Plan2View } from './Plan2View';
@@ -32,7 +33,10 @@ export function ProductDashboardView({ code }: { code: string }) {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false); // 進捗バー表示（完了アニメ含む）
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('plan1');
+  const sp = useSearchParams();
+  const urlTab = sp.get('tab');
+  const [tab, setTab] = useState<Tab>(
+    urlTab === 'plan2' || urlTab === 'detail' ? urlTab : 'plan1');
   // BO入力: 集計する実績期間の3択 + 想定の販売期間 + 総数指定
   const [periodMode, setPeriodMode] = useState<PeriodMode>('explicit');
   const [planStart, setPlanStart] = useState(isoDaysAgo(30)); // 想定の販売期間（lastyearモードで使用）

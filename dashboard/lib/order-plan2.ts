@@ -35,15 +35,15 @@ function addDays(iso: string, n: number): string {
 export type MetricFormat = 'int' | 'yen' | 'pct';
 export interface Plan2Metric {
   key: string; label: string; format: MetricFormat;
-  monthly: (number | null)[]; daily: (number | null)[];
+  yearly: (number | null)[]; monthly: (number | null)[]; daily: (number | null)[];
 }
 export interface Plan2SkuRow {
   color_name: string | null; size: string | null; sku_code: string | null;
-  daily: number[]; monthly: number[];
+  yearly: number[]; daily: number[]; monthly: number[];
 }
 export interface Plan2 {
   product_code: string; start: string; end: string;
-  months: string[]; days: string[];
+  years: string[]; months: string[]; days: string[];
   metrics: Plan2Metric[];
   skuPivot: Plan2SkuRow[];
   note: string;
@@ -84,16 +84,16 @@ function monthStartIso(end: string, monthsBack: number): string {
 }
 
 export async function fetchPlan2(pc: string, start: string, end: string): Promise<Plan2> {
-  // #6 月次/日次は別レンジ（顧客スプシ準拠）: 月次=長期・日次=短期。
-  //    月次=直近MONTHLY_MONTHSヶ月 / 日次=直近DAILY_DAYS日（end起点）。
-  //    月次は顧客要件「2年分」に合わせ 24ヶ月（受注は約2年バックフィル済）。
-  const MONTHLY_MONTHS = 24, DAILY_DAYS = 31;
-  const dailyStart = addDays(end, -(DAILY_DAYS - 1));
-  const monthlyStart = monthStartIso(end, MONTHLY_MONTHS);
-  const fetchStart = monthlyStart < dailyStart ? monthlyStart : dailyStart; // 取得は広い方（=月次）に合わせる
-  const allDays = enumDays(fetchStart, end);   // 取得・月次集計の母集合
-  const days = enumDays(dailyStart, end);      // 日次の表示列（短期）
-  const months = enumMonths(allDays);          // 月次の表示列（長期）
+  // 案2 = 年→月→日 ピボット（顧客スプシ準拠）。全期間（受注は約2年バックフィル）を母集合に集計。
+  //   月次は顧客要件「2年分」に合わせ 24ヶ月。日次ドリルダウンは全期間で可能。
+  const MONTHLY_MONTHS = 24;
+  const fetchStart = monthStartIso(end, MONTHLY_MONTHS);
+  const allDays = enumDays(fetchStart, end);   // 取得・集計の母集合（全期間）
+  const days = allDays;                          // 日次（全期間ドリルダウン用）
+  const months = enumMonths(allDays);          // 月次（約24ヶ月）
+  const years = [...new Set(months.map((m) => m.slice(0, 4)))].sort();
+  const daysOfYear: Record<string, string[]> = {};
+  for (const d of allDays) (daysOfYear[d.slice(0, 4)] ??= []).push(d);
 
   const [ordRows, uuRows, costRows, incRows, stkRows, cdaysRows, exclRows, pivRows] = await Promise.all([
     // 日次 受注（販売数/売上/上代/予約販売数）
@@ -122,9 +122,10 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
     q(`SELECT CAST(snapshot_date AS STRING) d, SUM(available_qty) s FROM ${T('stock_analysis')}
        WHERE product_code=@pc AND snapshot_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d`,
       { pc, sd: fetchStart, ed: end }),
-    // クーポン実施日（ショップ単位）
+    // クーポン実施日（ショップ単位）。brand_name(クーポンCSVのファイル名由来) と
+    // product_master.shop_name は表記ゆれ(大小・空白)があり得るため UPPER(TRIM()) で正規化して突合。
     q(`SELECT DISTINCT CAST(exclusion_date AS STRING) d FROM ${T('coupon_exclusion')}
-       WHERE brand_name=(SELECT ANY_VALUE(shop_name) FROM ${T('product_master')}
+       WHERE UPPER(TRIM(brand_name))=(SELECT UPPER(TRIM(ANY_VALUE(shop_name))) FROM ${T('product_master')}
                          WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc)))`, { pc }),
     // クーポン除外日（この品番）
     q(`SELECT DISTINCT CAST(exclusion_date AS STRING) d FROM ${T('coupon_exclusion')}
@@ -190,6 +191,7 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
 
   const metrics: Plan2Metric[] = metricDefs.map((m) => ({
     key: m.key, label: m.label, format: m.format,
+    yearly: years.map((y) => m.calc(daysOfYear[y] ?? [])),
     monthly: months.map((mm) => m.calc(daysByMonth[mm] ?? [])),
     daily: days.map((d) => m.calc([d])),
   }));
@@ -203,13 +205,14 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
   const skuPivot: Plan2SkuRow[] = Object.entries(skuMap)
     .map(([sk, v]) => ({
       color_name: v.cn, size: v.sz, sku_code: sk,
+      yearly: years.map((y) => (daysOfYear[y] ?? []).reduce((a, d) => a + (v.byDay[d] ?? 0), 0)),
       daily: days.map((d) => v.byDay[d] ?? 0),
       monthly: months.map((mm) => (daysByMonth[mm] ?? []).reduce((a, d) => a + (v.byDay[d] ?? 0), 0)),
     }))
     .sort((a, b) => (a.color_name ?? '').localeCompare(b.color_name ?? '') || (a.size ?? '').localeCompare(b.size ?? ''));
 
   return {
-    product_code: pc, start: fetchStart, end, months, days, metrics, skuPivot,
-    note: `月次=直近${months.length}ヶ月 / 日次=直近${days.length}日（別レンジ）`,
+    product_code: pc, start: fetchStart, end, years, months, days, metrics, skuPivot,
+    note: `年/月/日ピボット（${years.length}年 / ${months.length}ヶ月 / 全${days.length}日）`,
   };
 }
