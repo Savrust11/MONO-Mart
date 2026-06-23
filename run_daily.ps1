@@ -220,7 +220,18 @@ Log "[3d] Order management Excel generation start"
   ForEach-Object { Add-Content -Path $LOG -Value $_ -Encoding UTF8 }
 Log "[3d] Order Excel done exit=$LASTEXITCODE (latest: https://storage.googleapis.com/mono-back-office-system-exports/order_management/latest/%E7%99%BA%E6%B3%A8%E7%AE%A1%E7%90%86%E8%A1%A8.xlsx)"
 
-Log "===== DAILY RUN END scrape=$scrapeExit etl=$etlExit ====="
+# --- 3e) Data-gap monitor: flag dates whose orders import is missing / 0 / too low ---
+# Catches the "success but 0 rows" case (e.g. 2026-06-21/06-22) that step-level
+# failure alerts miss. Records to monitoring + Slack; non-fatal to the daily run.
+Log "[3e] Data-gap check start"
+Push-Location (Join-Path $ROOT "pipeline")
+& $PY (Join-Path $ROOT "pipeline\scrapers\check_data_gaps.py") "--days" 35 2>&1 |
+  ForEach-Object { Add-Content -Path $LOG -Value $_ -Encoding UTF8 }
+$gapExit = $LASTEXITCODE
+Pop-Location
+Log "[3e] Data-gap check done exit=$gapExit (1 = gaps detected -> see Slack / log)"
+
+Log "===== DAILY RUN END scrape=$scrapeExit etl=$etlExit gaps=$gapExit ====="
 
 # Prune logs older than 30 days.
 Get-ChildItem $LOGDIR -Filter "daily_*.log" |
