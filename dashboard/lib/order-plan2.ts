@@ -85,8 +85,9 @@ function monthStartIso(end: string, monthsBack: number): string {
 
 export async function fetchPlan2(pc: string, start: string, end: string): Promise<Plan2> {
   // #6 月次/日次は別レンジ（顧客スプシ準拠）: 月次=長期・日次=短期。
-  //    既定 月次=直近MONTHLY_MONTHSヶ月 / 日次=直近DAILY_DAYS日（end起点）。正式な遡及幅は顧客確認後に調整。
-  const MONTHLY_MONTHS = 12, DAILY_DAYS = 31;
+  //    月次=直近MONTHLY_MONTHSヶ月 / 日次=直近DAILY_DAYS日（end起点）。
+  //    月次は顧客要件「2年分」に合わせ 24ヶ月（受注は約2年バックフィル済）。
+  const MONTHLY_MONTHS = 24, DAILY_DAYS = 31;
   const dailyStart = addDays(end, -(DAILY_DAYS - 1));
   const monthlyStart = monthStartIso(end, MONTHLY_MONTHS);
   const fetchStart = monthlyStart < dailyStart ? monthlyStart : dailyStart; // 取得は広い方（=月次）に合わせる

@@ -111,6 +111,17 @@ Log "[1b] MMS cost fetch start"
 Log "[1b] MMS cost fetch done exit=$LASTEXITCODE (non-fatal - ETL still runs)"
 Remove-Item Env:\LOGIN_USER, Env:\LOGIN_PASS -ErrorAction SilentlyContinue
 
+# --- 1b2) MMS 発注書一覧 (No.49) — 前回発注日・前回原価 用 → analytics_layer.mms_orders ---
+# Scrapes order_list.php (発注日 既定550日遡及), writes GCS + BigQuery (WRITE_TRUNCATE).
+# Self-contained load (no main.py ETL step). Uses MMS LOGIN_USER/LOGIN_PASS. Non-fatal.
+$env:LOGIN_USER = $env:MMS_LOGIN_USER
+$env:LOGIN_PASS = $env:MMS_LOGIN_PASS
+Log "[1b2] MMS orders fetch start"
+& $PY (Join-Path $ROOT "pipeline\scrapers\fetch_mms_orders.py") 2>&1 |
+  ForEach-Object { Add-Content -Path $LOG -Value $_ -Encoding UTF8 }
+Log "[1b2] MMS orders fetch done exit=$LASTEXITCODE (non-fatal - ETL still runs)"
+Remove-Item Env:\LOGIN_USER, Env:\LOGIN_PASS -ErrorAction SilentlyContinue
+
 # --- 1c) Google Sheets (PF fee + hacchu / nyuukazan) — SA auth, no 2FA ---
 # Reads two client-shared sheets via sheets-fetcher@... SA and uploads CSV
 # to gs://.../uploads/sheets/pf_fee/ and gs://.../uploads/tableau/hacchu/.
