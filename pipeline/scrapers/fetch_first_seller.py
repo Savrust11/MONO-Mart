@@ -313,6 +313,15 @@ def main():
     csv.writer(buf).writerows(all_results)
     data = buf.getvalue().encode("utf-8-sig")
 
+    # 検証モード(LIMIT>0): 本番GCSを上書きしないよう、ローカル保存のみ。
+    if LIMIT:
+        local = "first_seller_LIMIT_test.csv"
+        with open(local, "wb") as f:
+            f.write(data)
+        print(f"\n✓ [LIMIT={LIMIT}/検証] local save: {local} "
+              f"({len(all_results)-1} rows) — 本番GCSには未アップロード")
+        return 0
+
     gcs_path = (f"uploads/zozo/first_seller/{target_date.isoformat()}/"
                 f"first_seller_W{iso_week:02d}.csv")
     storage.Client().bucket(bucket_name).blob(gcs_path).upload_from_string(
