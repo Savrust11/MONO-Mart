@@ -355,7 +355,7 @@ export async function fetchPeriodReport(pc: string, start: string, end: string):
   it(`▼直近${WIN_LONG}日 日販中央値`, med, '在庫あり受注0=0/在庫無し受注0=除外');
   it(`▼直近${WIN_LONG}日 現在庫日数`, sdL);
   it(`▼直近${WIN_LONG}日 完売想定日`, soldout(sdL));
-  blank(); sec('入荷山（予約管理表）');
+  blank(); sec('入荷残（予約管理表）');
   for (let i = 0; i < 3; i++) {
     const a = arrivals[i];
     it(`入荷日${i + 1}`, a?.d ? (a.d.value ?? a.d) : ''); it(`　入荷数${i + 1}`, a ? num(a.q) : '');

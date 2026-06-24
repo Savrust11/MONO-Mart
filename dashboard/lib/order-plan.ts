@@ -73,6 +73,20 @@ export interface Plan1Sku {
   arr3_date: string | null; arr3_qty: number | null;
 }
 
+// サイズの並び順（小→大）。文字サイズは規定順、数値サイズ(36/90等)は数値昇順、
+// フリー/不明は末尾。client 2026: 「サイズは小さいサイズから昇順」。
+const _SIZE_ORDER = ['XXS', 'XS', 'SS', 'S', 'M', 'L', 'LL', 'XL', '2L',
+                     'XXL', '3L', 'XXXL', '4L', '5L', '6L'];
+export function sizeRank(sz: string | null | undefined): number {
+  if (sz == null || String(sz).trim() === '') return 99999;
+  const s = String(sz).trim().toUpperCase();
+  const idx = _SIZE_ORDER.indexOf(s);
+  if (idx >= 0) return idx;                                   // 規定の文字サイズ
+  if (/^\d+(\.\d+)?$/.test(s)) return 1000 + parseFloat(s);   // 数値サイズ昇順
+  if (s === 'F' || s === 'FREE' || s.includes('フリー')) return 5000;
+  return 8000;                                                // 未知サイズは末尾寄り
+}
+
 export interface Plan1Image { color: string; url: string; }
 export interface Plan1 {
   images: Plan1Image[];   // 商品画像（カラー別）R02
@@ -275,6 +289,14 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
     };
   });
 
+  // カラーをまとめ（販売数の多いカラー順にグルーピング）、各カラー内はサイズ昇順
+  // （小→大）。client 2026: 「カラーはまとめたい、サイズは小さいサイズから昇順」。
+  skus.sort((a, b) =>
+    (colorTotal[b.color_name ?? ''] ?? 0) - (colorTotal[a.color_name ?? ''] ?? 0)
+    || (a.color_name ?? '').localeCompare(b.color_name ?? '', 'ja')
+    || sizeRank(a.size) - sizeRank(b.size)
+    || (a.size ?? '').localeCompare(b.size ?? '', 'ja'));
+
   return {
     images,
     header: { created_at: asof, start, end, product_code: pc, ...header },
@@ -290,7 +312,7 @@ export const PLAN1_GROUPS: { col: number; label: string }[] = [
   { col: 15, label: '▼直近7日' },
   { col: 19, label: '▼直近30日' },
   { col: 23, label: 'フリー在庫・予約' },
-  { col: 26, label: '入荷山' },
+  { col: 26, label: '入荷残' },
 ];
 export const PLAN1_GROUP_MARK = '▼指定期間合計'; // テーブル先頭行の検出用
 

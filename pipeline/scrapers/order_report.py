@@ -279,7 +279,7 @@ REPORT_LAYOUT = [
     ("item", f"▼直近{LONG}日 現在庫日数", f"{LONG}日現在庫日数", ""),
     ("item", f"▼直近{LONG}日 完売想定日", f"{LONG}日完売想定日", ""),
     ("blank", "", None, ""),
-    ("group_arrivals", "入荷山（予約管理表）", "_arrivals", ""),
+    ("group_arrivals", "入荷残（予約管理表）", "_arrivals", ""),
     ("group_fku", "FKU枚数構成（品番&カラー）", "_fku", ""),
     ("blank", "", None, ""),
     ("sec",  "② 内訳", None, ""),

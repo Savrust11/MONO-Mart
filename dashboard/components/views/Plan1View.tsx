@@ -161,12 +161,6 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
         )}
       </div>
 
-      <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-        ⚠ 推奨発注数は暫定式（スプシ未定義のため Phase1 式: 8週×日販−フリー在庫）。
-        {totalQty > 0 && ` 配分数(総数${totalQty.toLocaleString('ja-JP')})は暫定基準＝30日販売数構成比で按分（配分基準もスプシ未定義）。`}
-        顧客確定後に差し替えます。
-      </div>
-
       {/* SKU別明細（横スクロール） */}
       <div className="bg-white border border-gray-200 rounded overflow-x-auto">
         <table className="text-[12px] whitespace-nowrap border-collapse">
@@ -176,7 +170,7 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
               <th colSpan={4} className="px-2 py-1 border border-gray-200 bg-sky-100 text-center">▼直近7日</th>
               <th colSpan={4} className="px-2 py-1 border border-gray-200 bg-teal-100 text-center">▼直近30日</th>
               <th colSpan={3} className="px-2 py-1 border border-gray-200 bg-violet-100 text-center">フリー在庫・予約</th>
-              <th colSpan={Math.max(1, arrivalDates.length)} className="px-2 py-1 border border-gray-200 bg-amber-100 text-center">入荷山（日付別）</th>
+              <th colSpan={Math.max(1, arrivalDates.length)} className="px-2 py-1 border border-gray-200 bg-amber-100 text-center">入荷残（日付別）</th>
             </tr>
             <tr className="bg-gray-100 text-gray-600">
               <Th>集計不要</Th><Th>カラー</Th><Th>サイズ</Th><Th>SKU品番</Th><Th>上代</Th><Th>販売タイプ</Th>

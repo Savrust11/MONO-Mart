@@ -305,7 +305,7 @@ put("▼直近30日 日販中央値", median30, "在庫あり受注0=0/在庫無
 put("▼直近30日 現在庫日数", sd30)
 put("▼直近30日 完売想定日", soldout(sd30))
 r += 1
-section("入荷山（予約管理表）")
+section("入荷残（予約管理表）")
 for i in range(3):
     if i < len(arrivals):
         put(f"入荷日{i+1}", asdate(arrivals[i].d)); put(f"　入荷数{i+1}", arrivals[i].q)
