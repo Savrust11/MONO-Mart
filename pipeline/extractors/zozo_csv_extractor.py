@@ -963,11 +963,12 @@ class ZOZOCsvExtractor:
         Used as primary cost source for the order management mart;
         falls back to MMS cost_master when a product_code is missing.
 
-        Sheet structure (confirmed 2026-06-09):
+        Sheet structure (confirmed 2026-06-24, client EMQ指定):
           row 0: title (PF手数料表用《更新用》)
           row 1: section headers
-          row 2: column headers — col 5 = 品番, col 17 = 下代 税抜き
+          row 2: column headers — E列(5)=品番, M列(13)=お支払い料率, Q列(17)=下代 税抜き
           row 3+: data rows
+        ※「品番単位でのみ情報を持つ商品があるため」キーは SKU でなく品番(E)。
         """
         text = None
         for enc in ("utf-8-sig", "utf-8", "cp932"):
@@ -994,13 +995,18 @@ class ZOZOCsvExtractor:
         col_product = hdr.index("品番") if "品番" in hdr else None
         col_cost = None
         col_zozo_fee = None
+        col_pay_rate = None
         col_shop = hdr.index("ショップ名") if "ショップ名" in hdr else None
         for j, name in enumerate(hdr):
             n = (name or "").strip()
-            if "下代" in n and "税抜" in n:
+            if "下代" in n and "税抜" in n:        # Q列: 下代 税抜き (原価)
                 col_cost = j
             if "ZOZOTOWN" in n and "手数料率" in n:
                 col_zozo_fee = j
+            # M列: 「お支払い料率」(client 2026 EMQ指定)。ヘッダに改行を含むため
+            # ("お支払い\n料率") 部分一致で検出。"お支払い" は M列固有。
+            if "お支払い" in n and "料率" in n:
+                col_pay_rate = j
         if col_product is None or col_cost is None:
             logger.warning("PF fee: required columns missing (品番=%s 下代=%s)",
                            col_product, col_cost)
@@ -1018,14 +1024,22 @@ class ZOZOCsvExtractor:
                                                    and len(r) > col_shop) else None
             zozo_fee = (r[col_zozo_fee] or "").strip() if (
                 col_zozo_fee is not None and len(r) > col_zozo_fee) else None
+            # M列 お支払い料率 (例: "55%" or 0.55) → 分数に正規化。
+            pay_rate = None
+            if col_pay_rate is not None and len(r) > col_pay_rate:
+                pay_rate = _parse_float(
+                    str(r[col_pay_rate] or "").replace("%", "").replace(",", ""))
+                if pay_rate is not None and pay_rate > 1:   # "55"→0.55
+                    pay_rate = pay_rate / 100.0
             out.append({
-                "product_code":   product,
-                "shop_name":      shop or None,
-                "cost_price":     cost,    # 下代 税抜
-                "zozo_fee_rate":  zozo_fee or None,
-                "source_file":    "pf_fee",
-                "snapshot_date":  source_date,
-                "ingested_at":    None,    # filled by BQ default
+                "product_code":     product,
+                "shop_name":        shop or None,
+                "cost_price":       cost,    # 下代 税抜 (Q列)
+                "zozo_fee_rate":    zozo_fee or None,
+                "payment_fee_rate": pay_rate,   # お支払い料率 (M列, 分数 0.55=55%)
+                "source_file":      "pf_fee",
+                "snapshot_date":    source_date,
+                "ingested_at":      None,    # filled by BQ default
             })
         logger.info("Parsed %d PF-fee rows", len(out))
         return out
