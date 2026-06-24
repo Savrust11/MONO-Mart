@@ -215,6 +215,7 @@ CREATE TABLE IF NOT EXISTS `analytics_layer.sale_settings` (
   sale_type              STRING           OPTIONS(description="ZOZO企画タイムセール etc"),
   source_file            STRING,
   ingested_date          DATE,
+  captured_at            TIMESTAMP        OPTIONS(description="CSVダウンロード時刻 (GCS blob time_created)。常時タイムセールの価格を『いつ時点の価格か』で時系列追跡するため。再取込で上書きされる ingested_at と異なり元の取得時刻を保持。"),
   ingested_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 )
 PARTITION BY snapshot_date

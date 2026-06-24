@@ -811,11 +811,17 @@ class ZOZOCsvExtractor:
         self,
         data: bytes,
         source_date: str,
+        captured_at: str | None = None,
     ) -> list[dict[str, Any]]:
         """
         No.17 セール設定 (salegoods.csv) — current sale configurations per product.
         Returns records for raw_layer.sale_settings.
         Used to flag whether a product is currently on sale (プロパー vs セール discrimination).
+
+        captured_at: ダウンロード時刻 (= GCS blob の time_created)。「タイムセール
+        という名前の常時セール」で価格が変動するため、いつ時点の価格かを記録する
+        (client 2026: ダウンロード時点/時刻の保持)。再取込で上書きされる ingested_at
+        と異なり、元の取得時刻を保持する。
         """
         rows = _read_csv_bytes(data)
         logger.info("Parsing sale settings CSV: %d raw rows", len(rows))
@@ -844,6 +850,7 @@ class ZOZOCsvExtractor:
                 "sale_type":               mapped.get("sale_type"),
                 "source_file":             "salegoods",
                 "ingested_date":           source_date,
+                "captured_at":             captured_at,
             })
         logger.info("Parsed %d sale-setting rows", len(out))
         return out

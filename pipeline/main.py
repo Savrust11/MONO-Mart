@@ -448,7 +448,11 @@ def run_csv_ingestion(gcs_prefix: str, target_date: str) -> dict:
     try:
         rows = []
         for blob in _load_blobs("zozo/sale"):
-            rows.extend(zozo_csv.parse_sale_settings(blob.download_as_bytes(), target_date))
+            # captured_at = ダウンロード時刻 (GCS blob 作成時刻)。「常時タイムセール」で
+            # 価格が変動するため、いつ時点の価格かを保持する (client 2026)。
+            captured_at = blob.time_created.isoformat() if blob.time_created else None
+            rows.extend(zozo_csv.parse_sale_settings(
+                blob.download_as_bytes(), target_date, captured_at=captured_at))
         if rows:
             bq.upsert_sale_settings(rows, target_date)
         monitor.record_success(step, started, len(rows))
