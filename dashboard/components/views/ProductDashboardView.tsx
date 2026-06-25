@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Package, TrendingUp, Percent, Coins } from 'lucide-react';
 import { Plan1View } from './Plan1View';
 import { Plan2View } from './Plan2View';
-import { LoadingProgress } from '../LoadingProgress';
+import { CircularProgress } from '../CircularProgress';
 
 type Tab = 'plan1' | 'plan2' | 'detail';
 
@@ -251,10 +251,11 @@ export function ProductDashboardView({ code }: { code: string }) {
         <TabBtn active={tab === 'detail'} onClick={() => setTab('detail')}>項目詳細</TabBtn>
       </div>
 
-      {tab === 'plan1' && <Plan1View code={code} start={applied.start} end={applied.end} totalQty={applied.total} />}
-      {tab === 'plan2' && <Plan2View code={code} start={applied.start} end={applied.end} />}
+      {/* key で照会のたびに再マウント→即進捗表示・古いデータの残像を防ぐ */}
+      {tab === 'plan1' && <Plan1View key={`${code}|${applied.start}|${applied.end}|${applied.total}`} code={code} start={applied.start} end={applied.end} totalQty={applied.total} />}
+      {tab === 'plan2' && <Plan2View key={`${code}|${applied.start}|${applied.end}`} code={code} start={applied.start} end={applied.end} />}
 
-      {tab === 'detail' && busy && <LoadingProgress active={loading} label="項目詳細を集計中" onDone={() => setBusy(false)} />}
+      {tab === 'detail' && busy && <CircularProgress active={loading} label="項目詳細を集計中" onDone={() => setBusy(false)} />}
 
       {error && (
         <div className="bg-rose-50 border border-rose-200 rounded p-3 text-xs text-rose-700 mb-4">{error}</div>

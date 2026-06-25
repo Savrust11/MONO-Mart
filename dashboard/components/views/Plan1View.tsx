@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { LoadingProgress } from '../LoadingProgress';
+import { CircularProgress } from '../CircularProgress';
 
 // 発注管理表「期間集計」(旧:案1・SKU別明細ビュー)。/api/order-plan1 のレスポンス型。
 interface Plan1Sku {
@@ -39,8 +39,8 @@ const d = (v: string | null) => (v ? String(v).slice(0, 10) : '—');
 export function Plan1View({ code, start, end, totalQty = 0 }:
   { code: string; start: string; end: string; totalQty?: number }) {
   const [data, setData] = useState<Plan1 | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState(false); // 進捗バー表示（完了アニメ含む）
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(true); // 進捗（完了アニメ含む）。初期true＝即表示
   const [error, setError] = useState<string | null>(null);
   // 仕様: SKUに「集計不要」チェックがある。既定は全集計、チェックで除外。
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
@@ -73,7 +73,7 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
 
   useEffect(() => { run(); }, [run]);
 
-  if (busy) return <LoadingProgress active={loading} label="期間集計を集計中" onDone={() => setBusy(false)} />;
+  if (busy) return <CircularProgress active={loading} label="期間集計を集計中" onDone={() => setBusy(false)} />;
   if (error) return <div className="m-4 bg-rose-50 border border-rose-200 rounded p-3 text-xs text-rose-700">{error}</div>;
   if (!data) return null;
 

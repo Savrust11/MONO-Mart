@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { LoadingProgress } from '../LoadingProgress';
+import { CircularProgress } from '../CircularProgress';
 
 type MetricFormat = 'int' | 'yen' | 'pct';
 interface Plan2Metric { key: string; label: string; format: MetricFormat; yearly: (number | null)[]; monthly: (number | null)[]; daily: (number | null)[]; }
@@ -23,8 +23,8 @@ type Leaf = { type: 'year' | 'month' | 'day'; y: string; m?: string; d?: string;
 
 export function Plan2View({ code, start, end }: { code: string; start: string; end: string }) {
   const [data, setData] = useState<Plan2 | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(true);  // 初期true＝照会時に即進捗表示
   const [error, setError] = useState<string | null>(null);
   const [outMsg, setOutMsg] = useState<string | null>(null);
   const [outUrl, setOutUrl] = useState<string | null>(null);
@@ -59,7 +59,7 @@ export function Plan2View({ code, start, end }: { code: string; start: string; e
     setExpandedMonths(new Set());
   }, [data?.product_code, data?.years]);
 
-  if (busy) return <LoadingProgress active={loading} label="推移集計を集計中" onDone={() => setBusy(false)} />;
+  if (busy) return <CircularProgress active={loading} label="推移集計を集計中" onDone={() => setBusy(false)} />;
   if (error) return <div className="m-4 bg-rose-50 border border-rose-200 rounded p-3 text-xs text-rose-700">{error}</div>;
   if (!data) return null;
 

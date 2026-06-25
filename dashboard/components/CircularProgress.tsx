@@ -6,10 +6,12 @@ import { useEffect, useRef, useState } from 'react';
 //   active=true（取得中）: 0→約92% へ減速しながら上昇。
 //   active=false（完了）  : 100% に。
 // ※ BigQuery API は途中経過を返さないため % は時間ベースの推定（完了時のみ実値100%）。
-export function CircularProgress({ active, label = '読み込み中', size = 132 }:
-  { active: boolean; label?: string; size?: number }) {
+export function CircularProgress({ active, label = '読み込み中', size = 132, onDone }:
+  { active: boolean; label?: string; size?: number; onDone?: () => void }) {
   const [pct, setPct] = useState(6);
   const idRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
   useEffect(() => {
     if (active) {
@@ -18,8 +20,11 @@ export function CircularProgress({ active, label = '読み込み中', size = 132
       }, 130);
       return () => { if (idRef.current) { clearInterval(idRef.current); idRef.current = null; } };
     }
+    // 完了: 100% まで満たしてから（リングが切れないよう）親へ完了通知
     if (idRef.current) { clearInterval(idRef.current); idRef.current = null; }
     setPct(100);
+    const t = setTimeout(() => onDoneRef.current?.(), 480);
+    return () => clearTimeout(t);
   }, [active]);
 
   const stroke = 9;

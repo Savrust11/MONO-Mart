@@ -15,6 +15,7 @@ function cellColor(c: number | null): string {
 export function SeasonalCoefficientsView() {
   const [cats, setCats] = useState<Cat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(true);   // 進捗を100%まで見せてから本体表示
   const [error, setError] = useState<string | null>(null);
   const [updated, setUpdated] = useState<string | null>(null);
   const [gender, setGender] = useState<'ALL' | 'MEN' | 'WOMEN'>('ALL');
@@ -27,7 +28,7 @@ export function SeasonalCoefficientsView() {
     }).catch((e) => setError(String(e))).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <CircularProgress active label="季節係数を読み込み中" />;
+  if (busy) return <CircularProgress active={loading} label="季節係数を読み込み中" onDone={() => setBusy(false)} />;
   if (error) return <div className="m-4 bg-rose-50 border border-rose-200 rounded p-3 text-xs text-rose-700">{error}</div>;
 
   const weeks = Array.from({ length: 52 }, (_, i) => i + 1);
