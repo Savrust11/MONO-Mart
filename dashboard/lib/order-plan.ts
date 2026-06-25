@@ -28,6 +28,9 @@ async function q(sql: string, params: Record<string, unknown>): Promise<any[]> {
 }
 const num = (x: unknown): number => Number((x as any)?.value ?? x ?? 0) || 0;
 const r1 = (x: number) => Math.round(x * 10) / 10;
+// 顧客No.5 (2026-06-24 山口): 着荷が asof から N日より先の入荷予定は「将来の発注」と
+// みなし、フリー在庫に含めない（過大計上＝過小発注の防止）。着荷日なし・期日超過(過去日)は含める。
+const FUTURE_ARRIVAL_CUTOFF_DAYS = 180;
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const dval = (x: any): string | null => (x == null ? null : (x.value ?? String(x)));
 function median(a: number[]): number {
@@ -52,6 +55,9 @@ export interface Plan1Sku {
   sale_type: string | null;          // 販売タイプ
   favorites: number | null;          // お気に入り
   sales_qty: number;                 // 販売数（指定期間）
+  period_rev: number;                // 期間売上（顧客#1: 集計対象外SKUを引いた合計再計算用）
+  period_cost: number;               // 期間原価（PF優先, 同上）
+  period_lst: number;                // 期間上代額（同上）
   fku_share: number | null;          // FKU枚数構成（品番&カラー）
   last_order_date: string | null;    // 前回発注日
   last_cost: number | null;          // 前回原価
@@ -123,7 +129,7 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
   // ── 並行取得 ──
   const [
     skuMaster, periodSales, colorSales, stockRows, dailySku, dailyStk,
-    arrRows, lastOrd, costRows, resvRows, incRemain, arrivals, header, imgRows,
+    arrRows, lastOrd, costRows, resvRows, incRemain, arrivals, header, imgRows, pfRows,
   ] = await Promise.all([
     // SKUマスタ（product_master 起点で全登録SKU）
     q(`SELECT UPPER(TRIM(sku_code)) sk, ANY_VALUE(color_name) color_name, ANY_VALUE(size) size,
@@ -176,9 +182,14 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
        SELECT UPPER(TRIM(sku_code)) sk, SUM(quantity) q FROM ${T('reservations')}
        WHERE product_code=@pc AND reservation_date=(SELECT d FROM latest) GROUP BY sk`, { pc }),
     // 入荷残（最新 source_date）SKU別 → フリー在庫
+    // 顧客No.5: 着荷 > asof+N日 の入荷予定は将来発注扱いで除外（日付なし・期日超過は含める）
     q(`WITH latest AS (SELECT MAX(source_date) d FROM ${T('incoming_stock')} WHERE product_code=@pc)
        SELECT UPPER(TRIM(sku_code)) sk, SUM(incoming_qty) q FROM ${T('incoming_stock')}
-       WHERE product_code=@pc AND source_date=(SELECT d FROM latest) GROUP BY sk`, { pc }),
+       WHERE product_code=@pc AND source_date=(SELECT d FROM latest)
+         AND (earliest_arrival_date IS NULL
+              OR SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE)
+                 <= DATE_ADD(DATE(@asof), INTERVAL ${FUTURE_ARRIVAL_CUTOFF_DAYS} DAY))
+       GROUP BY sk`, { pc, asof }),
     // 入荷山1/2/3（品番単位・将来着）
     q(`SELECT SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE) d, SUM(incoming_qty) q
        FROM ${T('incoming_stock')} WHERE product_code=@pc AND earliest_arrival_date IS NOT NULL
@@ -193,7 +204,12 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
        SELECT pm.color_name cn, ANY_VALUE(pm.item_code) ic, ANY_VALUE(cm.color_id) cid
        FROM pm LEFT JOIN ${T('color_master')} cm ON TRIM(cm.color_name)=TRIM(pm.color_name)
        GROUP BY pm.color_name`, { pc }),
+    // PF原価（品番単位・粗利率の原価優先元）— 顧客No.7。per-SKU原価＝PF優先→MMS の算出用
+    q(`SELECT ANY_VALUE(cost_price) val FROM ${T('pf_fee_master')}
+       WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc))
+         AND snapshot_date=(SELECT MAX(snapshot_date) FROM ${T('pf_fee_master')}) AND cost_price>0`, { pc }),
   ]);
+  const pfCost = pfRows[0]?.val == null ? null : num(pfRows[0].val);
 
   // 商品画像（カラー別）
   const images: Plan1Image[] = imgRows
@@ -207,7 +223,7 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
   const m = <V>(rows: any[], val: (r: any) => V) => {
     const o: Record<string, V> = {}; for (const r of rows) o[r.sk] = val(r); return o;
   };
-  const psMap = m(periodSales, (r) => ({ qty: num(r.qty), cn: r.cn, sz: r.sz }));
+  const psMap = m(periodSales, (r) => ({ qty: num(r.qty), rev: num(r.rev), lst: num(r.lst), cn: r.cn, sz: r.sz }));
   const stMap = m(stockRows, (r) => ({ cur: num(r.cur), fav: num(r.fav) }));
   const arrMap = m(arrRows, (r) => dval(r.d));
   const ordMap = m(lastOrd, (r) => ({ od: dval(r.od), up: r.up == null ? null : num(r.up) }));
@@ -239,6 +255,11 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
     const cur = st.cur;
     const salesQty = ps?.qty ?? 0;
     const color = sm.color_name ?? ps?.cn ?? null;
+    // 顧客#1: 集計対象外SKUを引いた合計を再計算するための per-SKU 期間値（原価はPF優先→MMS）
+    const unitCost = pfCost ?? costMap[sk] ?? null;
+    const periodRev = ps?.rev ?? 0;
+    const periodLst = ps?.lst ?? 0;
+    const periodCost = unitCost == null ? 0 : salesQty * unitCost;
 
     // FKU枚数構成（品番&カラー）= カラー合計 ÷ 品番合計
     const fku = productTotalQty ? r2((colorTotal[color ?? ''] ?? 0) / productTotalQty) : null;
@@ -275,7 +296,8 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
       color_name: color, size: sm.size ?? ps?.sz ?? null, sku_code: sk === '' ? null : sk,
       retail_price: sm.retail == null ? null : num(sm.retail),
       sale_type: sm.sale_type ?? null,
-      favorites: st.fav, sales_qty: salesQty, fku_share: fku,
+      favorites: st.fav, sales_qty: salesQty,
+      period_rev: periodRev, period_cost: periodCost, period_lst: periodLst, fku_share: fku,
       last_order_date: ordMap[sk]?.od ?? null, last_cost: ordMap[sk]?.up ?? null,
       latest_avg_cost: costMap[sk] ?? null, last_arrival_date: arrMap[sk] ?? null,
       current_stock: cur, recommended_qty: recommended, recommended_provisional: true,
@@ -325,7 +347,7 @@ export function plan1ToMatrix(p: Plan1): (string | number)[][] {
   const fkuv = (x: number | null | undefined) => (x == null ? '' : `${Math.round(x * 100)}%`);
   // ── ① ヘッダ（label/value 縦並び：左ブロック）──
   const head: (string | number)[][] = [
-    ['発注管理表 案1'],
+    ['発注管理表 期間集計'],
     ['作成日', v(h.created_at)],
     ['集計開始日', v(h.start)],
     ['集計終了日', v(h.end)],
@@ -397,13 +419,20 @@ async function fetchHeader(pc: string, start: string, end: string, asof: string)
     q(`SELECT SUM(sales_quantity) qty, SUM(sales_amount) rev, SUM(proper_price*sales_quantity) lst
        FROM ${T('sales_daily')} WHERE product_code=@pc AND source_file='orders'
          AND sale_date BETWEEN DATE(@sd) AND DATE(@ed)`, { pc, sd: start, ed: end }),
-    // 原価: PF品番優先→なければSKU MMS評価額（粗利率算出用）。期間の SKU別 販売×原価。
+    // 原価（顧客No.7 2026-06-24 古城）: PF手数料表の原価(下代・品番単位)を優先し、
+    //   無い場合(PF原価=0/未登録)のみ MMS原価(cost_master・SKU単位)を参照する。
+    //   ＝マート(06_simple_mart_build)・予約管理表と同一の COALESCE(PF, MMS) ロジック。粗利率算出用。
     q(`WITH s AS (SELECT UPPER(TRIM(sku_code)) sk, color_name, size, SUM(sales_quantity) qty, SUM(sales_amount) rev
                   FROM ${T('sales_daily')} WHERE product_code=@pc AND source_file='orders'
                     AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY sk,color_name,size),
-            c AS (SELECT UPPER(TRIM(sku_code)) sk, ANY_VALUE(valuation_price) vp FROM ${T('cost_master')}
-                  WHERE product_code=@pc GROUP BY sk)
-       SELECT SUM(s.rev) rev, SUM(s.qty*COALESCE(c.vp,0)) cost, COUNTIF(c.vp IS NULL AND s.qty>0) miss
+            pfc AS (SELECT ANY_VALUE(cost_price) val FROM ${T('pf_fee_master')}
+                    WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc))
+                      AND snapshot_date=(SELECT MAX(snapshot_date) FROM ${T('pf_fee_master')}) AND cost_price>0),
+            c AS (SELECT UPPER(TRIM(sku_code)) sk, ANY_VALUE(cost_price) vp FROM ${T('cost_master')}
+                  WHERE product_code=@pc AND valid_to IS NULL GROUP BY sk)
+       SELECT SUM(s.rev) rev,
+              SUM(s.qty*COALESCE((SELECT val FROM pfc), c.vp, 0)) cost,
+              COUNTIF((SELECT val FROM pfc) IS NULL AND c.vp IS NULL AND s.qty>0) miss
        FROM s LEFT JOIN c ON c.sk=s.sk`, { pc, sd: start, ed: end }),
   ]);
   const m = mRow[0] ?? {};

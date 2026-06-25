@@ -169,6 +169,12 @@ inc AS (
     SUM(incoming_qty)         AS incoming_stock
   FROM `analytics_layer.incoming_stock`
   WHERE source_date = DATE(@target_date)
+    -- 顧客No.5 (2026-06-24 山口): 着荷 > target_date+180日 の入荷予定は「将来の発注」と
+    --   みなしフリー在庫に含めない（過大計上＝過小発注の防止）。
+    --   着荷日なし・期日超過(過去日)は従来どおり含める。
+    AND (earliest_arrival_date IS NULL
+         OR SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE)
+            <= DATE_ADD(DATE(@target_date), INTERVAL 180 DAY))
   GROUP BY j_product_code, j_color_name, j_size
 ),
 

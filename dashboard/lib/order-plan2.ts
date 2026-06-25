@@ -53,7 +53,7 @@ export interface Plan2 {
 export function plan2ToMatrix(p: Plan2): (string | number)[][] {
   const m: (string | number)[][] = [];
   const v = (x: number | null) => (x == null ? '' : x);
-  m.push(['発注管理表 案2', `品番=${p.product_code}`, `期間=${p.start}〜${p.end}`]);
+  m.push(['発注管理表 推移集計', `品番=${p.product_code}`, `期間=${p.start}〜${p.end}`]);
   m.push([]);
   m.push(['【月次】指標', ...p.months]);
   for (const mt of p.metrics) m.push([mt.label, ...mt.monthly.map(v)]);
@@ -77,17 +77,10 @@ function enumMonths(days: string[]): string[] {
   const set = new Set<string>(); for (const d of days) set.add(d.slice(0, 7));
   return [...set].sort();
 }
-// end の月から monthsBack ヶ月さかのぼった月初を返す（#6 月次レンジ用）。
-function monthStartIso(end: string, monthsBack: number): string {
-  const [y, m] = end.split('-').map(Number);
-  return new Date(Date.UTC(y, (m - 1) - (monthsBack - 1), 1)).toISOString().slice(0, 10);
-}
-
 export async function fetchPlan2(pc: string, start: string, end: string): Promise<Plan2> {
-  // 案2 = 年→月→日 ピボット（顧客スプシ準拠）。全期間（受注は約2年バックフィル）を母集合に集計。
-  //   月次は顧客要件「2年分」に合わせ 24ヶ月。日次ドリルダウンは全期間で可能。
-  const MONTHLY_MONTHS = 24;
-  const fetchStart = monthStartIso(end, MONTHLY_MONTHS);
+  // 案2 = 年→月→日 ピボット（顧客スプシ準拠）。
+  //   顧客#13: 固定2年(2024/7~)ではなく、指定期間(start..end)のみを集計対象にする。
+  const fetchStart = start;
   const allDays = enumDays(fetchStart, end);   // 取得・集計の母集合（全期間）
   const days = allDays;                          // 日次（全期間ドリルダウン用）
   const months = enumMonths(allDays);          // 月次（約24ヶ月）
@@ -105,13 +98,17 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
     q(`SELECT CAST(sale_date AS STRING) d, SUM(unique_visitors) uu, SUM(favorites) fav
        FROM ${T('sales_daily')} WHERE product_code=@pc
          AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d`, { pc, sd: fetchStart, ed: end }),
-    // 日次 原価（粗利率用）: SKU別販売×最新評価額
+    // 日次 原価（顧客No.7 2026-06-24 古城）: PF手数料表の原価(下代・品番単位)を優先し、
+    //   無い場合のみ MMS原価(cost_master・SKU単位)を参照。マート/予約管理表と同一ロジック。粗利率算出用。
     q(`WITH s AS (SELECT CAST(sale_date AS STRING) d, UPPER(TRIM(sku_code)) sk, SUM(sales_quantity) qty
                   FROM ${T('sales_daily')} WHERE product_code=@pc AND source_file='orders'
                     AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d, sk),
-            c AS (SELECT UPPER(TRIM(sku_code)) sk, ANY_VALUE(valuation_price) vp FROM ${T('cost_master')}
-                  WHERE product_code=@pc GROUP BY sk)
-       SELECT s.d, SUM(s.qty*COALESCE(c.vp,0)) cost FROM s LEFT JOIN c ON c.sk=s.sk GROUP BY s.d`,
+            pfc AS (SELECT ANY_VALUE(cost_price) val FROM ${T('pf_fee_master')}
+                    WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc))
+                      AND snapshot_date=(SELECT MAX(snapshot_date) FROM ${T('pf_fee_master')}) AND cost_price>0),
+            c AS (SELECT UPPER(TRIM(sku_code)) sk, ANY_VALUE(cost_price) vp FROM ${T('cost_master')}
+                  WHERE product_code=@pc AND valid_to IS NULL GROUP BY sk)
+       SELECT s.d, SUM(s.qty*COALESCE((SELECT val FROM pfc), c.vp, 0)) cost FROM s LEFT JOIN c ON c.sk=s.sk GROUP BY s.d`,
       { pc, sd: fetchStart, ed: end }),
     // 入荷数量（着日別・最新スナップショット）
     q(`SELECT CAST(SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE) AS STRING) d, SUM(incoming_qty) q
