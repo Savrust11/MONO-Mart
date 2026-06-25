@@ -36,7 +36,7 @@ export function Plan2View({ code, start, end }: { code: string; start: string; e
     try {
       const res = await fetch(`/api/order-plan2/to-sheet?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}`, { method: 'POST' });
       const j = await res.json();
-      if (res.ok) { setOutMsg(`✓ スプレッドシート「案2」タブに出力しました（${j.rows}行）`); setOutUrl(j.url || null); }
+      if (res.ok) { setOutMsg(`✓ 新規スプレッドシート「${j.filename}」を作成しました（${j.rows}行）`); setOutUrl(j.url || null); }
       else setOutMsg(`エラー: ${j.error || '失敗'}`);
     } catch (e) { setOutMsg('通信エラー: ' + String(e)); }
   }, [code, start, end]);
@@ -59,7 +59,7 @@ export function Plan2View({ code, start, end }: { code: string; start: string; e
     setExpandedMonths(new Set());
   }, [data?.product_code, data?.years]);
 
-  if (busy) return <LoadingProgress active={loading} label="案2（時系列）を集計中" onDone={() => setBusy(false)} />;
+  if (busy) return <LoadingProgress active={loading} label="推移集計を集計中" onDone={() => setBusy(false)} />;
   if (error) return <div className="m-4 bg-rose-50 border border-rose-200 rounded p-3 text-xs text-rose-700">{error}</div>;
   if (!data) return null;
 
@@ -124,12 +124,17 @@ export function Plan2View({ code, start, end }: { code: string; start: string; e
         </div>
       </div>
 
-      {/* 指標 × 年/月/日 ピボット */}
+      {/* 顧客#12: 品番合計（指標）とSKU別を「1つの表」に統合し、列を完全連動・同一スクロールに */}
       <div className="bg-white border border-gray-200 rounded overflow-x-auto">
-        <table className="text-[12px] whitespace-nowrap border-collapse">
+        <table className="text-[12px] whitespace-nowrap border-collapse table-fixed">
+          <colgroup>
+            <col className="w-[92px]" /><col className="w-[56px]" /><col className="w-[110px]" />
+            {leaves.map((_, i) => <col key={i} className="w-[84px]" />)}
+          </colgroup>
           <thead>
+            {/* 年 */}
             <tr className="bg-gray-100 text-gray-700">
-              <th rowSpan={3} className="px-2 py-1.5 border border-gray-200 text-left sticky left-0 bg-gray-100 z-10">指標</th>
+              <th colSpan={3} rowSpan={2} className="px-2 py-1.5 border border-gray-200 text-left sticky left-0 bg-gray-100 z-20">品番合計 / SKU</th>
               {yearGroups.map((g) => (
                 <th key={g.y} colSpan={g.span} onClick={() => toggleYear(g.y)}
                   className="px-2 py-1 border border-gray-200 text-center cursor-pointer select-none hover:bg-gray-200 font-semibold">
@@ -137,6 +142,7 @@ export function Plan2View({ code, start, end }: { code: string; start: string; e
                 </th>
               ))}
             </tr>
+            {/* 月 */}
             <tr className="bg-gray-50 text-gray-600">
               {monthGroups.map((g, gi) => g.collapsedYear ? (
                 <th key={`y${gi}`} className="px-2 py-1 border border-gray-200 text-center text-gray-300">—</th>
@@ -147,7 +153,11 @@ export function Plan2View({ code, start, end }: { code: string; start: string; e
                 </th>
               ))}
             </tr>
+            {/* 葉（カラー/サイズ/SKU品番 ＋ 年計/月計/日） */}
             <tr className="bg-white text-gray-500">
+              <th className="px-2 py-1 border border-gray-200 text-left sticky left-0 bg-white z-20">カラー</th>
+              <th className="px-2 py-1 border border-gray-200 text-left sticky left-[92px] bg-white z-20">サイズ</th>
+              <th className="px-2 py-1 border border-gray-200 text-left sticky left-[148px] bg-white z-20">SKU品番</th>
               {leaves.map((lf, i) => (
                 <th key={i} className="px-2 py-1 border border-gray-200 text-right font-normal text-[11px]">
                   {lf.type === 'year' ? '年計' : lf.type === 'month' ? '月計' : `${lf.d!.slice(8)}日`}
@@ -156,53 +166,38 @@ export function Plan2View({ code, start, end }: { code: string; start: string; e
             </tr>
           </thead>
           <tbody>
+            {/* ── 品番合計（指標）── */}
+            <tr className="bg-indigo-50 text-indigo-800">
+              <td colSpan={3 + colCount} className="px-2 py-1 border border-gray-100 font-semibold">■ 品番合計（指標）</td>
+            </tr>
             {data.metrics.map((m) => (
               <tr key={m.key} className="border-b border-gray-50 hover:bg-gray-50">
-                <td className="px-2 py-1 border border-gray-100 font-medium text-gray-700 sticky left-0 bg-white z-10">{m.label}</td>
+                <td colSpan={3} className="px-2 py-1 border border-gray-100 font-medium text-gray-700 sticky left-0 bg-white z-10">{m.label}</td>
                 {leaves.map((lf, i) => (
                   <td key={i} className="px-2 py-1 border border-gray-100 text-right tabular-nums">{fmt(mVal(m, lf), m.format)}</td>
                 ))}
               </tr>
             ))}
+            {/* ── SKU別 販売数 ── */}
+            <tr className="bg-teal-50 text-teal-800">
+              <td colSpan={3 + colCount} className="px-2 py-1 border border-gray-100 font-semibold">■ SKU別 販売数</td>
+            </tr>
+            {data.skuPivot.length === 0 && (
+              <tr><td colSpan={3 + colCount} className="px-3 py-3 text-gray-400">販売実績のあるSKUがありません。</td></tr>
+            )}
+            {data.skuPivot.map((s, ri) => (
+              <tr key={s.sku_code ?? ri} className="border-b border-gray-50 hover:bg-gray-50">
+                <td className="px-2 py-1 border border-gray-100 sticky left-0 bg-white z-10 truncate">{s.color_name ?? '—'}</td>
+                <td className="px-2 py-1 border border-gray-100 sticky left-[92px] bg-white z-10 truncate">{s.size ?? '—'}</td>
+                <td className="px-2 py-1 border border-gray-100 font-mono sticky left-[148px] bg-white z-10 truncate">{s.sku_code ?? '—'}</td>
+                {leaves.map((lf, i) => {
+                  const v = sVal(s, lf);
+                  return <td key={i} className={`px-2 py-1 border border-gray-100 text-right tabular-nums ${v === 0 ? 'text-gray-300' : ''}`}>{v.toLocaleString('ja-JP')}</td>;
+                })}
+              </tr>
+            ))}
           </tbody>
         </table>
-      </div>
-
-      {/* SKU × 年/月/日 販売数ピボット（同じ展開状態に連動） */}
-      <div>
-        <div className="text-[12px] font-semibold text-gray-700 mb-1">SKU別 販売数（年/月/日）</div>
-        <div className="bg-white border border-gray-200 rounded overflow-x-auto">
-          <table className="text-[12px] whitespace-nowrap border-collapse">
-            <thead>
-              <tr className="bg-gray-100 text-gray-600">
-                <th className="px-2 py-1.5 border border-gray-200 text-left sticky left-0 bg-gray-100 z-10">カラー</th>
-                <th className="px-2 py-1.5 border border-gray-200 text-left">サイズ</th>
-                <th className="px-2 py-1.5 border border-gray-200 text-left">SKU品番</th>
-                {leaves.map((lf, i) => (
-                  <th key={i} className="px-2 py-1.5 border border-gray-200 text-right text-[11px]">
-                    {lf.type === 'year' ? `${lf.y}` : lf.type === 'month' ? lf.m!.slice(5) : lf.d!.slice(8)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.skuPivot.length === 0 && (
-                <tr><td colSpan={3 + colCount} className="px-3 py-3 text-gray-400">販売実績のあるSKUがありません。</td></tr>
-              )}
-              {data.skuPivot.map((s, ri) => (
-                <tr key={s.sku_code ?? ri} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="px-2 py-1 border border-gray-100 sticky left-0 bg-white z-10">{s.color_name ?? '—'}</td>
-                  <td className="px-2 py-1 border border-gray-100">{s.size ?? '—'}</td>
-                  <td className="px-2 py-1 border border-gray-100 font-mono">{s.sku_code ?? '—'}</td>
-                  {leaves.map((lf, i) => {
-                    const v = sVal(s, lf);
-                    return <td key={i} className={`px-2 py-1 border border-gray-100 text-right tabular-nums ${v === 0 ? 'text-gray-300' : ''}`}>{v.toLocaleString('ja-JP')}</td>;
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   );

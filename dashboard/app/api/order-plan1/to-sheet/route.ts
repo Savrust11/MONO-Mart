@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchPlan1, plan1ToMatrix, PLAN1_GROUP_MARK, PLAN1_TABLE_COLS } from '@/lib/order-plan';
-import { writeMatrixToTab } from '@/lib/sheets-out';
+import { writeMatrixToNewSheet } from '@/lib/sheets-out';
+
+// 顧客#9: ファイル名の日付（JST・出力日）= YYYYMMDD
+const jstYmd = (): string => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10).replace(/-/g, '');
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -59,6 +62,46 @@ function buildPlan1Format(sheetId: number, values: (string | number)[][]): unkno
       bgReq(sheetId, h, values.length, 13, 14, C.pink),
       bgReq(sheetId, h, values.length, 14, 15, C.cyan),
     );
+
+    // 顧客#11: 数値書式・整列をダッシュボードに合わせる（データ行＝列見出しの次〜末尾）
+    const d0 = h + 1, d1 = values.length;
+    const numFmt = (c0: number, c1: number, pattern: string, type = 'NUMBER') => ({
+      repeatCell: {
+        range: { sheetId, startRowIndex: d0, endRowIndex: d1, startColumnIndex: c0, endColumnIndex: c1 },
+        cell: { userEnteredFormat: { numberFormat: { type, pattern } } },
+        fields: 'userEnteredFormat.numberFormat',
+      },
+    });
+    const align = (c0: number, c1: number, a: 'LEFT' | 'RIGHT') => ({
+      repeatCell: {
+        range: { sheetId, startRowIndex: d0, endRowIndex: d1, startColumnIndex: c0, endColumnIndex: c1 },
+        cell: { userEnteredFormat: { horizontalAlignment: a } },
+        fields: 'userEnteredFormat.horizontalAlignment',
+      },
+    });
+    // 桁区切り（上代/原価/枚数/在庫/入荷数など）
+    for (const c of [3, 5, 6, 9, 10, 12, 13, 14, 15, 19, 23, 25, 27, 29, 31]) reqs.push(numFmt(c, c + 1, '#,##0'));
+    // 日販（小数1桁）
+    for (const c of [16, 20]) reqs.push(numFmt(c, c + 1, '#,##0.0'));
+    // 在庫日数（〇日）
+    for (const c of [17, 21, 24]) reqs.push(numFmt(c, c + 1, '0"日"'));
+    // FKU枚数構成（〇%）
+    reqs.push(numFmt(7, 8, '0%', 'PERCENT'));
+    // 日付（yyyy-mm-dd）
+    for (const c of [8, 11, 18, 22, 26, 28, 30]) reqs.push(numFmt(c, c + 1, 'yyyy-mm-dd', 'DATE'));
+    // 整列：文字列＝左、数値＝右、日付＝左（ダッシュボードと同じ）
+    reqs.push(align(0, 3, 'LEFT'), align(4, 5, 'LEFT'), align(3, 4, 'RIGHT'), align(5, N, 'RIGHT'));
+    for (const c of [8, 11, 18, 22, 26, 28, 30]) reqs.push(align(c, c + 1, 'LEFT'));
+
+    // ヘッダ「合計」値セル（B列）: 粗利率/値引率=〇.〇%、上代額=〇円、枚数=桁区切り
+    const hdrFmt = (row: number, pattern: string, type = 'NUMBER') => ({
+      repeatCell: {
+        range: { sheetId, startRowIndex: row, endRowIndex: row + 1, startColumnIndex: 1, endColumnIndex: 2 },
+        cell: { userEnteredFormat: { numberFormat: { type, pattern } } },
+        fields: 'userEnteredFormat.numberFormat',
+      },
+    });
+    reqs.push(hdrFmt(12, '0.0%', 'PERCENT'), hdrFmt(13, '0.0%', 'PERCENT'), hdrFmt(14, '#,##0"円"'), hdrFmt(15, '#,##0'));
   }
   return reqs;
 }
@@ -79,8 +122,9 @@ export async function POST(req: NextRequest) {
   try {
     const plan = await fetchPlan1(pc, start, end);
     const matrix = plan1ToMatrix(plan);
+    // 顧客#8/#9/#10: 出力ごとに独立スプシを `品番-日付-連番` で新規作成（上書き・色残り解消）
     // =IMAGE / %表示のため USER_ENTERED、書式（色帯・ハイライト）も適用
-    const res = await writeMatrixToTab('案1', matrix, {
+    const res = await writeMatrixToNewSheet(`${pc}-${jstYmd()}`, '期間集計', matrix, {
       valueInputOption: 'USER_ENTERED',
       format: buildPlan1Format,
     });

@@ -34,6 +34,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ...plan, generated_at: new Date().toISOString() });
   } catch (err) {
     console.error('[api/order-plan2] Error:', err);
-    return NextResponse.json({ error: '案2の集計に失敗しました: ' + String(err).slice(0, 200) }, { status: 500 });
+    return NextResponse.json({ error: '推移集計の集計に失敗しました: ' + String(err).slice(0, 200) }, { status: 500 });
   }
 }

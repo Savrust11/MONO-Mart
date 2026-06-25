@@ -244,10 +244,10 @@ export function ProductDashboardView({ code }: { code: string }) {
         </div>
       )}
 
-      {/* タブ切替（案1 / 項目詳細）※案2は実装予定 */}
+      {/* タブ切替（期間集計＝旧案1 / 推移集計＝旧案2 / 項目詳細）。顧客#7: 名称変更 */}
       <div className="flex gap-1 border-b border-gray-200 mb-4">
-        <TabBtn active={tab === 'plan1'} onClick={() => setTab('plan1')}>案1（SKU別明細）</TabBtn>
-        <TabBtn active={tab === 'plan2'} onClick={() => setTab('plan2')}>案2（時系列）</TabBtn>
+        <TabBtn active={tab === 'plan1'} onClick={() => setTab('plan1')}>期間集計</TabBtn>
+        <TabBtn active={tab === 'plan2'} onClick={() => setTab('plan2')}>推移集計</TabBtn>
         <TabBtn active={tab === 'detail'} onClick={() => setTab('detail')}>項目詳細</TabBtn>
       </div>
 

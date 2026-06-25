@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchPlan2, plan2ToMatrix } from '@/lib/order-plan2';
-import { writeMatrixToTab } from '@/lib/sheets-out';
+import { writeMatrixToNewSheet } from '@/lib/sheets-out';
+
+// 顧客#9: ファイル名の日付（JST・出力日）= YYYYMMDD
+const jstYmd = (): string => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10).replace(/-/g, '');
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -20,7 +23,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const plan = await fetchPlan2(pc, start, end);
-    const res = await writeMatrixToTab('案2', plan2ToMatrix(plan));
+    // 顧客#8/#9/#10: 出力ごとに独立スプシを `品番-日付-連番` で新規作成
+    const res = await writeMatrixToNewSheet(`${pc}-${jstYmd()}`, '推移集計', plan2ToMatrix(plan));
     return NextResponse.json({ ok: true, ...res });
   } catch (err) {
     console.error('[api/order-plan2/to-sheet] Error:', err);

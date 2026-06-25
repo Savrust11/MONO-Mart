@@ -3,11 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { LoadingProgress } from '../LoadingProgress';
 
-// 発注管理表「案1」= SKU別明細ビュー。/api/order-plan1 のレスポンス型。
+// 発注管理表「期間集計」(旧:案1・SKU別明細ビュー)。/api/order-plan1 のレスポンス型。
 interface Plan1Sku {
   color_name: string | null; size: string | null; sku_code: string | null;
   retail_price: number | null; sale_type: string | null; favorites: number | null;
-  sales_qty: number; fku_share: number | null;
+  sales_qty: number; period_rev: number; period_cost: number; period_lst: number; fku_share: number | null;
   last_order_date: string | null; last_cost: number | null; latest_avg_cost: number | null;
   last_arrival_date: string | null; current_stock: number;
   recommended_qty: number | null; recommended_provisional: boolean; confirmed_qty: null;
@@ -54,7 +54,7 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
     try {
       const res = await fetch(`/api/order-plan1/to-sheet?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}`, { method: 'POST' });
       const j = await res.json();
-      if (res.ok) { setOutMsg(`✓ スプレッドシート「案1」タブに出力しました（${j.rows}行）`); setOutUrl(j.url || null); }
+      if (res.ok) { setOutMsg(`✓ 新規スプレッドシート「${j.filename}」を作成しました（${j.rows}行）`); setOutUrl(j.url || null); }
       else setOutMsg(`エラー: ${j.error || '失敗'}`);
     } catch (e) { setOutMsg('通信エラー: ' + String(e)); }
   }, [code, start, end]);
@@ -73,35 +73,66 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
 
   useEffect(() => { run(); }, [run]);
 
-  if (busy) return <LoadingProgress active={loading} label="案1（SKU別明細）を集計中" onDone={() => setBusy(false)} />;
+  if (busy) return <LoadingProgress active={loading} label="期間集計を集計中" onDone={() => setBusy(false)} />;
   if (error) return <div className="m-4 bg-rose-50 border border-rose-200 rounded p-3 text-xs text-rose-700">{error}</div>;
   if (!data) return null;
 
   const h = data.header;
-  const rows = data.skus.filter((s) => !excluded.has(s.sku_code ?? ''));
+  const isExcluded = (s: Plan1Sku) => excluded.has(s.sku_code ?? '');
+  // 顧客#5/#6: 「集計不要」は行を消さず最下行へ移動・グレー表示し、いつでも✔を外して復活可能にする。
+  //   集計（配分・入荷列）は除外SKUを含めない（=activeRows）。
+  const rows = [...data.skus].sort((a, b) => Number(isExcluded(a)) - Number(isExcluded(b)));
+  const activeRows = data.skus.filter((s) => !isExcluded(s));
   const toggle = (sk: string) =>
     setExcluded((p) => { const x = new Set(p); x.has(sk) ? x.delete(sk) : x.add(sk); return x; });
 
+  // 顧客#1: 品番合計から「集計対象外SKU」を除外。除外ゼロ時はサーバ値（厳密一致）、除外時のみ再計算。
+  const round1 = (x: number) => Math.round(x * 10) / 10;
+  const hdr = excluded.size === 0
+    ? { qty: h.total_qty, lst: h.total_list_amount, margin: h.total_margin_pct, discount: h.total_discount_pct }
+    : (() => {
+        const rev = activeRows.reduce((a, s) => a + (s.period_rev || 0), 0);
+        const cost = activeRows.reduce((a, s) => a + (s.period_cost || 0), 0);
+        const lst = activeRows.reduce((a, s) => a + (s.period_lst || 0), 0);
+        const qty = activeRows.reduce((a, s) => a + (s.sales_qty || 0), 0);
+        return {
+          qty,
+          lst: lst || null,
+          margin: rev > 0 ? round1((rev - cost) / rev * 100) : null,
+          discount: lst > 0 ? round1((1 - rev / lst) * 100) : null,
+        };
+      })();
+  const totalLabel = excluded.size > 0 ? `（集計対象 ${activeRows.length}/${data.skus.length} SKU）` : '';
+
   // 総数指定→SKU配分（⚠暫定: 30日販売数構成比＋最大剰余法。配分基準はスプシ未定義のため要確認）
   const alloc: Record<string, number> = {};
-  if (totalQty > 0 && rows.length) {
-    const w = rows.map((s) => Math.max(s.l30_qty || 0, 0));
+  if (totalQty > 0 && activeRows.length) {
+    const w = activeRows.map((s) => Math.max(s.l30_qty || 0, 0));
     const sumW = w.reduce((a, b) => a + b, 0);
-    const raw = rows.map((_, i) => (sumW > 0 ? totalQty * (w[i] / sumW) : totalQty / rows.length));
+    const raw = activeRows.map((_, i) => (sumW > 0 ? totalQty * (w[i] / sumW) : totalQty / activeRows.length));
     const floor = raw.map(Math.floor);
     let residual = totalQty - floor.reduce((a, b) => a + b, 0);
     raw.map((r, i) => ({ i, f: r - Math.floor(r) })).sort((a, b) => b.f - a.f)
       .forEach(({ i }) => { if (residual-- > 0) floor[i] += 1; });
-    rows.forEach((s, i) => { alloc[s.sku_code ?? ''] = floor[i]; });
+    activeRows.forEach((s, i) => { alloc[s.sku_code ?? ''] = floor[i]; });
   }
 
   // #3 入荷山を「日付ごと」に整列（左詰めをやめる）。全SKUの入荷予定日を集めて列に並べ、
   //    各SKUの入荷数量を該当する日付列の下に配置する。
   const arrivalDates: string[] = (() => {
     const set = new Set<string>();
-    for (const s of rows) for (const dt of [s.arr1_date, s.arr2_date, s.arr3_date]) if (dt) set.add(dt);
+    for (const s of activeRows) for (const dt of [s.arr1_date, s.arr2_date, s.arr3_date]) if (dt) set.add(dt);
     return Array.from(set).sort();
   })();
+  // テーブル総列数（除外行の colSpan 用）。先頭4列（集計不要/カラー/サイズ/SKU品番）以外をまとめる。
+  const COLS = 16 + (totalQty > 0 ? 1 : 0) + 4 + 4 + 3 + Math.max(1, arrivalDates.length);
+  // 顧客#6: 全SKUが「集計不要」のカラーは、画像を2段目（集計対象外・斜線/グレー）へ移す。
+  const excludedColors = new Set(
+    Array.from(new Set(data.skus.map((s) => s.color_name).filter((c): c is string => !!c)))
+      .filter((c) => { const g = data.skus.filter((s) => s.color_name === c); return g.length > 0 && g.every(isExcluded); })
+  );
+  const activeImages = data.images.filter((im) => !excludedColors.has(im.color));
+  const excludedImages = data.images.filter((im) => excludedColors.has(im.color));
   const arrQtyOf = (s: Plan1Sku, dt: string): number => {
     let q = 0;
     if (s.arr1_date === dt) q += s.arr1_qty ?? 0;
@@ -122,10 +153,10 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
         <Field label="商品タイプ" value={`${h.item_type_parent ?? '—'} / ${h.item_type_child ?? '—'}`} />
         <Field label="集計期間" value={`${d(h.start)} 〜 ${d(h.end)}`} />
         <Field label="累計レビュー" value={`${n(h.review_count)}件 / ${h.review_avg ?? '—'}点`} />
-        <Field label="合計粗利率" value={h.total_margin_pct == null ? '—' : `${h.total_margin_pct}%`} />
-        <Field label="合計値引率" value={h.total_discount_pct == null ? '—' : `${h.total_discount_pct}%`} />
-        <Field label="合計上代額" value={n(h.total_list_amount, '円')} />
-        <Field label="合計販売数" value={n(h.total_qty, '点')} />
+        <Field label={`合計粗利率${totalLabel}`} value={hdr.margin == null ? '—' : `${hdr.margin}%`} />
+        <Field label={`合計値引率${totalLabel}`} value={hdr.discount == null ? '—' : `${hdr.discount}%`} />
+        <Field label={`合計上代額${totalLabel}`} value={n(hdr.lst, '円')} />
+        <Field label={`合計販売数${totalLabel}`} value={n(hdr.qty, '点')} />
       </div>
 
       {/* 商品画像（カラー別）R02 */}
@@ -133,7 +164,7 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
         <div className="bg-white border border-gray-200 rounded p-3">
           <div className="text-[11px] text-gray-500 mb-2">商品画像（カラー別）</div>
           <div className="flex flex-wrap gap-3">
-            {data.images.map((im) => (
+            {activeImages.map((im) => (
               <figure key={im.color} className="text-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={im.url} alt={im.color}
@@ -143,6 +174,26 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
               </figure>
             ))}
           </div>
+          {/* 顧客#6: 集計対象外カラーの画像は2段目へ移動。斜線＋グレースケールで除外を明示 */}
+          {excludedImages.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-dashed border-gray-300">
+              <div className="text-[10px] text-gray-400 mb-2">集計対象外（チェックで除外中）</div>
+              <div className="flex flex-wrap gap-3">
+                {excludedImages.map((im) => (
+                  <figure key={im.color} className="text-center">
+                    <div className="relative h-24 w-24">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={im.url} alt={im.color}
+                        className="h-24 w-24 object-cover rounded border border-gray-200 grayscale opacity-40" />
+                      <div className="absolute inset-0 rounded pointer-events-none"
+                        style={{ backgroundImage: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.25) 0 5px, transparent 5px 10px)' }} />
+                    </div>
+                    <figcaption className="text-[10px] text-gray-400 mt-1 w-24 truncate line-through">{im.color}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -187,10 +238,26 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
             </tr>
           </thead>
           <tbody>
-            {rows.map((s, i) => (
+            {rows.map((s, i) => {
+              // 顧客#5/#6: 集計不要の行は消さず、グレー＋斜線で「集計対象外」を最下行に残す（✔を外せば復活）
+              if (isExcluded(s)) return (
+                <tr key={s.sku_code ?? i} className="bg-gray-100 text-gray-400 border-b border-gray-100">
+                  <Td center>
+                    <input type="checkbox" checked title="チェックを外すと集計に復活します"
+                      onChange={() => toggle(s.sku_code ?? '')} />
+                  </Td>
+                  <Td>{s.color_name ?? '—'}</Td><Td>{s.size ?? '—'}</Td><Td mono>{s.sku_code ?? '—'}</Td>
+                  <td colSpan={COLS - 4}
+                    className="px-2 py-1 border border-gray-100 italic text-gray-400 text-[11px]"
+                    style={{ backgroundImage: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.06) 0 6px, transparent 6px 12px)' }}>
+                    集計対象外（チェックを外すと復活します）
+                  </td>
+                </tr>
+              );
+              return (
               <tr key={s.sku_code ?? i} className="border-b border-gray-50 hover:bg-gray-50">
                 <Td center>
-                  <input type="checkbox" checked={excluded.has(s.sku_code ?? '')}
+                  <input type="checkbox" checked={false}
                     onChange={() => toggle(s.sku_code ?? '')} />
                 </Td>
                 <Td>{s.color_name ?? '—'}</Td><Td>{s.size ?? '—'}</Td>
@@ -222,12 +289,13 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
                       return <Td key={dt} num cls="bg-amber-50">{q > 0 ? n(q) : '—'}</Td>;
                     })}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
       <div className="text-[11px] text-gray-500">
-        SKU {rows.length} / {data.skus.length} 件{excluded.size > 0 && `（${excluded.size}件を集計不要で除外中）`}
+        集計対象 {activeRows.length} / 全 {data.skus.length} SKU{excluded.size > 0 && `（${excluded.size}件を集計対象外として最下行にグレー表示中・✔を外すと復活）`}
       </div>
     </div>
   );
