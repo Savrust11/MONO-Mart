@@ -17,6 +17,12 @@ function isoDaysAgo(n: number): string {
   const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10);
 }
 function isoToday(): string { return new Date().toISOString().slice(0, 10); }
+// 基準日 + n日 (未来/過去) を YYYY-MM-DD で返す
+function isoAddDays(base: string, n: number): string {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(base) ? new Date(base) : new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 // 昨年同期: 指定日の1年前（YYYY-MM-DD）
 function yearAgo(iso: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
@@ -39,8 +45,18 @@ export function ProductDashboardView({ code }: { code: string }) {
     urlTab === 'plan2' || urlTab === 'detail' ? urlTab : 'plan1');
   // BO入力: 集計する実績期間の3択 + 想定の販売期間 + 総数指定
   const [periodMode, setPeriodMode] = useState<PeriodMode>('explicit');
-  const [planStart, setPlanStart] = useState(isoDaysAgo(30)); // 想定の販売期間（lastyearモードで使用）
-  const [planEnd, setPlanEnd] = useState(isoDaysAgo(0));
+  // 想定の販売期間（未来窓）= いつから(N日後) × 何日分(M日分)。client FB#3。
+  // 例: 45日後から75日分 = 8/8〜10/22。0 = ラジオ未選択(=📅で直接指定中)。
+  const [fromSel, setFromSel] = useState<number>(45); // いつから（既定45日後）
+  const [forSel, setForSel] = useState<number>(75);   // 何日分（既定75日分）
+  const [planStart, setPlanStart] = useState(isoAddDays(isoToday(), 45));
+  const [planEnd, setPlanEnd] = useState(isoAddDays(isoAddDays(isoToday(), 45), 75));
+  // ラジオ選択時に 想定の販売期間 を再計算（開始=今日+いつから / 終了=開始+何日分）
+  const applyFuture = useCallback((fromDays: number, forDays: number) => {
+    const ps = isoAddDays(isoToday(), fromDays);
+    setPlanStart(ps);
+    setPlanEnd(isoAddDays(ps, forDays));
+  }, []);
   const [totalQty, setTotalQty] = useState(''); // 総数指定（任意・SKU内訳の按分用）
   // 照会で確定した条件（案1/案2ビューへ渡す。入力中の都度fetchを避ける）
   const [applied, setApplied] = useState({ start: isoDaysAgo(30), end: isoDaysAgo(0), total: 0 });
@@ -123,7 +139,46 @@ export function ProductDashboardView({ code }: { code: string }) {
 
       {/* BO入力（集計する実績期間 3択 ＋ 想定の販売期間 ＋ 総数指定） */}
       <div className="bg-white border border-gray-200 rounded p-3 mb-4 space-y-3">
-        {/* 実績期間モード */}
+        {/* ① 想定の販売期間（未来窓）— client FB#3: いつから × 何日分 */}
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-end gap-2">
+            <span className="text-[11px] text-gray-500 pb-2 w-20">想定の販売期間</span>
+            <DateField label="開始" value={planStart}
+              onChange={(v) => { setPlanStart(v); setFromSel(0); }} />
+            <span className="pb-2 text-gray-400">〜</span>
+            <DateField label="終了" value={planEnd}
+              onChange={(v) => { setPlanEnd(v); setForSel(0); }} />
+            <span className="pb-2 text-[11px] text-indigo-600">
+              → {planStart} 〜 {planEnd}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
+            <span className="text-[11px] text-gray-500 w-20">いつから</span>
+            {[15, 30, 45, 60, 75].map((n) => (
+              <label key={n} className="inline-flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="fromSel" checked={fromSel === n}
+                  onChange={() => { setFromSel(n); applyFuture(n, forSel || 75); }} />
+                <span className={fromSel === n ? 'text-gray-900' : 'text-gray-500'}>{n}日後〜</span>
+              </label>
+            ))}
+            <span className="text-[10px] text-gray-400">（または上の📅で日付直接指定）</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
+            <span className="text-[11px] text-gray-500 w-20">何日分</span>
+            {[30, 45, 60, 75, 90, 120].map((m) => (
+              <label key={m} className="inline-flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="forSel" checked={forSel === m}
+                  onChange={() => { setForSel(m); applyFuture(fromSel || 45, m); }} />
+                <span className={forSel === m ? 'text-gray-900' : 'text-gray-500'}>{m}日分</span>
+              </label>
+            ))}
+            <span className="text-[10px] text-gray-400">（または上の📅で日付直接指定）</span>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100" />
+
+        {/* ② 実績期間モード */}
         <div className="flex flex-wrap items-center gap-4 text-[13px]">
           <span className="text-[11px] text-gray-500">集計する実績期間</span>
           {([
@@ -142,14 +197,9 @@ export function ProductDashboardView({ code }: { code: string }) {
         {/* モード別の日付入力 */}
         <div className="flex flex-wrap items-end gap-3">
           {periodMode === 'lastyear' && (
-            <>
-              <DateField label="想定の販売期間（開始）" value={planStart} onChange={setPlanStart} />
-              <span className="pb-2 text-gray-400">〜</span>
-              <DateField label="（終了）" value={planEnd} onChange={setPlanEnd} />
-              <span className="pb-2 text-[11px] text-indigo-600">
-                → 実績は {yearAgo(planStart)} 〜 {yearAgo(planEnd)}（昨年同期）で集計
-              </span>
-            </>
+            <span className="pb-2 text-[11px] text-indigo-600">
+              → 実績は {yearAgo(planStart)} 〜 {yearAgo(planEnd)}（想定販売期間の昨年同期）で集計
+            </span>
           )}
           {periodMode === 'explicit' && (
             <>
