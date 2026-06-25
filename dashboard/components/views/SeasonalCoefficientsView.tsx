@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { CircularProgress } from '@/components/CircularProgress';
 
 interface Cat { gender: string; child_item_type: string; weeks: (number | null)[]; total: number; }
 
@@ -26,7 +27,7 @@ export function SeasonalCoefficientsView() {
     }).catch((e) => setError(String(e))).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="p-4 text-sm text-gray-500">季節係数を読み込み中…</div>;
+  if (loading) return <CircularProgress active label="季節係数を読み込み中" />;
   if (error) return <div className="m-4 bg-rose-50 border border-rose-200 rounded p-3 text-xs text-rose-700">{error}</div>;
 
   const weeks = Array.from({ length: 52 }, (_, i) => i + 1);
