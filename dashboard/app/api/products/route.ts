@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchOrderAnalysis } from '@/lib/bigquery';
+import { fetchOrderAnalysis, fetchLatestAnalysisDate } from '@/lib/bigquery';
 import { todayJST } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -10,11 +10,14 @@ const MOCK_URL = process.env.MOCK_API_URL;
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
 
-  const date         = searchParams.get('date')         || todayJST();
+  const dateParam    = (searchParams.get('date') || 'latest').trim();
   const product_code = searchParams.get('product_code') || undefined;
   const urgency      = searchParams.get('urgency')      || undefined;
   const limit        = Math.min(Number(searchParams.get('limit')  || 500), 1000);
   const offset       = Number(searchParams.get('offset') || 0);
+
+  // 顧客#15: date=latest（既定）→ マート最新日を採用。「今日」で空になるのを防ぐ。
+  const date = dateParam === 'latest' ? ((await fetchLatestAnalysisDate()) || todayJST()) : dateParam;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: 'Invalid date format. Use YYYY-MM-DD.' }, { status: 400 });

@@ -17,6 +17,16 @@ function getBQClient(): BigQuery {
   return _bq;
 }
 
+// 顧客#15: 発注推奨データ画面が「今日」で空になるのを防ぐため、マートの最新日を返す。
+export async function fetchLatestAnalysisDate(): Promise<string | null> {
+  const bq = getBQClient();
+  const [rows] = await bq.query({
+    query: `SELECT CAST(MAX(analysis_date) AS STRING) AS d FROM \`${PROJECT_ID}.${DATASET_MART}.order_analysis\``,
+    location: 'asia-northeast1',
+  });
+  return (rows as { d: string | null }[])[0]?.d ?? null;
+}
+
 export interface OrderAnalysisRow {
   analysis_date: string;
   product_code: string;

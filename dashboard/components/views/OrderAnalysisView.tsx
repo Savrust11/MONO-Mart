@@ -15,7 +15,7 @@ const EXCEL_LATEST_URL =
   + '/order_management/latest/%E7%99%BA%E6%B3%A8%E7%AE%A1%E7%90%86%E8%A1%A8.xlsx';
 
 export function OrderAnalysisView() {
-  const [date, setDate]           = useState<string>(todayJST());
+  const [date, setDate]           = useState<string>('');  // 空=最新日(マートMAX)を採用（顧客#15）
   const [rows, setRows]           = useState<OrderAnalysisRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError]         = useState<string | null>(null);
@@ -26,12 +26,13 @@ export function OrderAnalysisView() {
     setIsLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ date, limit: '1000' });
+      const params = new URLSearchParams({ date: date || 'latest', limit: '1000' });
       if (urgencyFilter) params.append('urgency', urgencyFilter);
       const res = await fetch(`/api/products?${params}`);
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const json = await res.json();
       setRows(json.data || []);
+      if (!date && json.date) setDate(json.date);  // 最新日を日付入力に反映（顧客#15）
     } catch (err) {
       setError(String(err));
     } finally {
