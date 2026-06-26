@@ -119,7 +119,11 @@ export function TreeSidebar() {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     if (tree) {
-      tree.forEach((g, i) => { initial[g.label] = i === 0; });
+      // 先頭グループ、または現在のページを含むグループを開いた状態にする
+      tree.forEach((g, i) => {
+        const hasCurrent = g.children?.some((c) => c.href.split('?')[0] === pathname);
+        initial[g.label] = i === 0 || !!hasCurrent;
+      });
     }
     return initial;
   });
