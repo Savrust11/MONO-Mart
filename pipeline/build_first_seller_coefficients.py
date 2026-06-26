@@ -65,9 +65,13 @@ WITH pm AS (
   FROM `{A}.product_master`
   WHERE child_item_type IS NOT NULL AND child_item_type!='' GROUP BY pc),
 fs AS (
-  SELECT f.gender, pm.ct AS child_item_type, f.iso_week AS week_number, SUM(f.units) units
-  FROM `{tbl}` f JOIN pm ON UPPER(TRIM(f.product_code))=pm.pc
-  WHERE f.gender IN ('MEN','WOMEN') GROUP BY 1,2,3),
+  -- 年をまたぐ同一ISO週(例 W25が2025/2026)は平均して二重計上を防ぐ
+  SELECT gender, child_item_type, week_number, AVG(yr_units) units
+  FROM (
+    SELECT f.gender, pm.ct AS child_item_type, f.iso_week AS week_number, f.iso_year, SUM(f.units) yr_units
+    FROM `{tbl}` f JOIN pm ON UPPER(TRIM(f.product_code))=pm.pc
+    WHERE f.gender IN ('MEN','WOMEN') GROUP BY 1,2,3,4)
+  GROUP BY 1,2,3),
 cat AS (
   SELECT gender, child_item_type, AVG(units) avg_u
   FROM fs GROUP BY 1,2 HAVING COUNT(*) >= {MIN_WEEKS} AND SUM(units) >= 100)
