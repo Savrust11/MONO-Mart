@@ -85,14 +85,15 @@ const n = (v: number | null | undefined, suffix = '') =>
   v == null ? '—' : v.toLocaleString('ja-JP') + suffix;
 const d = (v: string | null) => (v ? String(v).slice(0, 10) : '—');
 
-export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180 }:
-  { code: string; start: string; end: string; totalQty?: number; cutoffN?: number }) {
+export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
+  excluded, onToggleExclude, onResetExclude }:
+  { code: string; start: string; end: string; totalQty?: number; cutoffN?: number;
+    excluded: Set<string>; onToggleExclude: (sk: string) => void; onResetExclude: () => void }) {
   const [data, setData] = useState<Plan1 | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(true); // 進捗（完了アニメ含む）。初期true＝即表示
   const [error, setError] = useState<string | null>(null);
-  // 仕様: SKUに「集計不要」チェックがある。既定は全集計、チェックで除外。
-  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  // 集計不要は親(ProductDashboardView)で保持＝期間集計/推移集計で共有・タブ切替でも維持。
   const [outMsg, setOutMsg] = useState<string | null>(null);
   const [outUrl, setOutUrl] = useState<string | null>(null);
   // #1 確定発注数: 手入力欄（SKU品番ごと）。既定は空欄、未入力時は推奨発注数をプレースホルダ表示。
@@ -115,7 +116,7 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180 }:
         `/api/order-plan1?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}&n=${cutoffN}`);
       const j = await res.json();
       if (!res.ok) { setError(j.error || '取得に失敗しました'); setData(null); }
-      else { setData(j as Plan1); setExcluded(new Set()); }
+      else { setData(j as Plan1); }
     } catch (e) { setError('通信エラー: ' + String(e)); setData(null); }
     finally { setLoading(false); }
   }, [code, start, end]);
@@ -132,8 +133,7 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180 }:
   //   集計（配分・入荷列）は除外SKUを含めない（=activeRows）。
   const rows = [...data.skus].sort((a, b) => Number(isExcluded(a)) - Number(isExcluded(b)));
   const activeRows = data.skus.filter((s) => !isExcluded(s));
-  const toggle = (sk: string) =>
-    setExcluded((p) => { const x = new Set(p); x.has(sk) ? x.delete(sk) : x.add(sk); return x; });
+  const toggle = (sk: string) => onToggleExclude(sk);
 
   // 顧客#1: 品番合計から「集計対象外SKU」を除外。除外ゼロ時はサーバ値（厳密一致）、除外時のみ再計算。
   const round1 = (x: number) => Math.round(x * 10) / 10;
@@ -273,6 +273,19 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180 }:
           </a>
         )}
       </div>
+
+      {/* 集計対象外（集計不要✔）の件数と一括復活。最下部のグレー行を探さなくても1クリックで戻せる。*/}
+      {excluded.size > 0 && (
+        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded px-3 py-2 text-[12px]">
+          <span className="text-amber-800">
+            <b>{excluded.size}件</b>のSKUを「集計対象外」にしています（表の最下部にグレーで表示・推移集計の品番合計からも除外）。
+          </span>
+          <button onClick={onResetExclude}
+            className="ml-auto px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[12px] font-medium">
+            すべて集計に戻す
+          </button>
+        </div>
+      )}
 
       {/* 推奨発注数の色分け凡例（顧客・欠品補正: 実数とシミュレーションを判別）*/}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">

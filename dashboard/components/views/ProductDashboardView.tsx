@@ -59,6 +59,11 @@ export function ProductDashboardView({ code }: { code: string }) {
   }, []);
   const [totalQty, setTotalQty] = useState(''); // 総数指定（任意・SKU内訳の按分用）
   const [cutoffN, setCutoffN] = useState('180'); // 基準日数N: 入荷予定が今日+N日より先はフリー在庫から除外
+  // 集計不要SKU（Plan1で✔）。期間集計・推移集計で共有し、タブ切替でも保持する。品番が変われば自動リセット。
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const toggleExclude = (sk: string) =>
+    setExcluded((p) => { const x = new Set(p); x.has(sk) ? x.delete(sk) : x.add(sk); return x; });
+  const resetExclude = () => setExcluded(new Set());
   // 照会で確定した条件（案1/案2ビューへ渡す。入力中の都度fetchを避ける）
   const [applied, setApplied] = useState({ start: isoDaysAgo(30), end: isoDaysAgo(0), total: 0, n: 180 });
 
@@ -103,6 +108,7 @@ export function ProductDashboardView({ code }: { code: string }) {
   }, [code, applied]);
 
   useEffect(() => { run(); /* 初回・品番変更時に自動照会 */ }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setExcluded(new Set()); /* 品番が変わったら集計不要をリセット */ }, [code]);
 
   // 時系列・SKU別は折りたたみ（PVT的に +/- で展開・折り畳み）。既定は折りたたみ。
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -267,8 +273,9 @@ export function ProductDashboardView({ code }: { code: string }) {
       </div>
 
       {/* key で照会のたびに再マウント→即進捗表示・古いデータの残像を防ぐ */}
-      {tab === 'plan1' && <Plan1View key={`${code}|${applied.start}|${applied.end}|${applied.total}|${applied.n}`} code={code} start={applied.start} end={applied.end} totalQty={applied.total} cutoffN={applied.n} />}
-      {tab === 'plan2' && <Plan2View key={`${code}|${applied.start}|${applied.end}`} code={code} start={applied.start} end={applied.end} />}
+      {tab === 'plan1' && <Plan1View key={`${code}|${applied.start}|${applied.end}|${applied.total}|${applied.n}`} code={code} start={applied.start} end={applied.end} totalQty={applied.total} cutoffN={applied.n}
+        excluded={excluded} onToggleExclude={toggleExclude} onResetExclude={resetExclude} />}
+      {tab === 'plan2' && <Plan2View key={`${code}|${applied.start}|${applied.end}`} code={code} start={applied.start} end={applied.end} excluded={excluded} />}
 
       {tab === 'detail' && busy && <CircularProgress active={loading} label="項目詳細を集計中" onDone={() => setBusy(false)} />}
 

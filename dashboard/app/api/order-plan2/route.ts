@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
   const pc = (searchParams.get('product_code') || '').trim();
   const start = searchParams.get('start') || '';
   const end = searchParams.get('end') || '';
+  // 集計不要SKU（Plan1で✔した分）。カンマ区切り。品番合計から除外する。
+  const exclude = (searchParams.get('exclude') || '').split(',').map((s) => s.trim()).filter(Boolean);
 
   if (!pc) return NextResponse.json({ error: '品番（product_code）を指定してください。' }, { status: 400 });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
@@ -20,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (start > end) return NextResponse.json({ error: '開始日が終了日より後になっています。' }, { status: 400 });
 
   try {
-    const plan = await fetchPlan2(pc, start, end);
+    const plan = await fetchPlan2(pc, start, end, exclude);
     if (searchParams.get('format') === 'csv') {
       const csv = matrixToCsv(plan2ToMatrix(plan));
       return new NextResponse(csv, {

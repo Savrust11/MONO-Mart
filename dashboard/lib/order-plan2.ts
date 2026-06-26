@@ -77,7 +77,11 @@ function enumMonths(days: string[]): string[] {
   const set = new Set<string>(); for (const d of days) set.add(d.slice(0, 7));
   return [...set].sort();
 }
-export async function fetchPlan2(pc: string, start: string, end: string): Promise<Plan2> {
+export async function fetchPlan2(pc: string, start: string, end: string,
+  excludeSkus: string[] = []): Promise<Plan2> {
+  // 集計不要SKUを品番合計（販売数/売上/上代/原価→粗利率）から除外。空なら全件。
+  const exNorm = excludeSkus.map((s) => s.toUpperCase().trim()).filter(Boolean);
+  const exclSql = exNorm.length ? 'AND UPPER(TRIM(sku_code)) NOT IN UNNEST(@excl)' : '';
   // 案2 = 年→月→日 ピボット（顧客スプシ準拠）。
   //   顧客#13: 固定2年(2024/7~)ではなく、指定期間(start..end)のみを集計対象にする。
   const fetchStart = start;
@@ -99,7 +103,8 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
     q(`SELECT CAST(sale_date AS STRING) d, SUM(sales_quantity) qty, SUM(sales_amount) rev,
          SUM(proper_price*sales_quantity) lst, SUM(IF(sale_type LIKE '%予約%', sales_quantity, 0)) yqty
        FROM ${T('sales_daily')} WHERE product_code=@pc AND source_file='orders'
-         AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d`, { pc, sd: fetchStart, ed: end }),
+         AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) ${exclSql} GROUP BY d`,
+      { pc, sd: fetchStart, ed: end, ...(exNorm.length ? { excl: exNorm } : {}) }),
     // 日次 UU/お気に入り（商品別実績(新)＝source_file 指定なしで合算）
     q(`SELECT CAST(sale_date AS STRING) d, SUM(unique_visitors) uu, SUM(favorites) fav
        FROM ${T('sales_daily')} WHERE product_code=@pc
@@ -108,14 +113,14 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
     //   無い場合のみ MMS原価(cost_master・SKU単位)を参照。マート/予約管理表と同一ロジック。粗利率算出用。
     q(`WITH s AS (SELECT CAST(sale_date AS STRING) d, UPPER(TRIM(sku_code)) sk, SUM(sales_quantity) qty
                   FROM ${T('sales_daily')} WHERE product_code=@pc AND source_file='orders'
-                    AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d, sk),
+                    AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) ${exclSql} GROUP BY d, sk),
             pfc AS (SELECT ANY_VALUE(cost_price) val FROM ${T('pf_fee_master')}
                     WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc))
                       AND snapshot_date=(SELECT MAX(snapshot_date) FROM ${T('pf_fee_master')}) AND cost_price>0),
             c AS (SELECT UPPER(TRIM(sku_code)) sk, ANY_VALUE(cost_price) vp FROM ${T('cost_master')}
                   WHERE product_code=@pc AND valid_to IS NULL GROUP BY sk)
        SELECT s.d, SUM(s.qty*COALESCE((SELECT val FROM pfc), c.vp, 0)) cost FROM s LEFT JOIN c ON c.sk=s.sk GROUP BY s.d`,
-      { pc, sd: fetchStart, ed: end }),
+      { pc, sd: fetchStart, ed: end, ...(exNorm.length ? { excl: exNorm } : {}) }),
     // 入荷数量（着日別・最新スナップショット）
     q(`SELECT CAST(SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE) AS STRING) d, SUM(incoming_qty) q
        FROM ${T('incoming_stock')} WHERE product_code=@pc AND earliest_arrival_date IS NOT NULL

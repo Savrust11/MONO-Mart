@@ -21,7 +21,9 @@ function fmt(v: number | null, f: MetricFormat): string {
 // ピボットの「葉」列。年(計)/月(計)/日 のいずれか。idx は yearly/monthly/daily への添字。
 type Leaf = { type: 'year' | 'month' | 'day'; y: string; m?: string; d?: string; idx: number };
 
-export function Plan2View({ code, start, end }: { code: string; start: string; end: string }) {
+export function Plan2View({ code, start, end, excluded }:
+  { code: string; start: string; end: string; excluded: Set<string> }) {
+  const exParam = [...excluded].join(',');  // Plan1で集計不要にしたSKU→品番合計から除外
   const [data, setData] = useState<Plan2 | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(true);  // 初期true＝照会時に即進捗表示
@@ -44,13 +46,13 @@ export function Plan2View({ code, start, end }: { code: string; start: string; e
   const run = useCallback(async () => {
     setBusy(true); setLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/order-plan2?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}`);
+      const res = await fetch(`/api/order-plan2?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}${exParam ? `&exclude=${encodeURIComponent(exParam)}` : ''}`);
       const j = await res.json();
       if (!res.ok) { setError(j.error || '取得に失敗しました'); setData(null); }
       else setData(j as Plan2);
     } catch (e) { setError('通信エラー: ' + String(e)); setData(null); }
     finally { setLoading(false); }
-  }, [code, start, end]);
+  }, [code, start, end, exParam]);  // 集計不要が変わったら再集計（品番合計を除外で再計算）
   useEffect(() => { run(); }, [run]);
 
   // 既定: 最新の年だけ展開（直近の月が見える状態）。読み込みのたびに初期化。
@@ -185,17 +187,20 @@ export function Plan2View({ code, start, end }: { code: string; start: string; e
             {data.skuPivot.length === 0 && (
               <tr><td colSpan={3 + colCount} className="px-3 py-3 text-gray-400">販売実績のあるSKUがありません。</td></tr>
             )}
-            {data.skuPivot.map((s, ri) => (
-              <tr key={s.sku_code ?? ri} className="border-b border-gray-50 hover:bg-gray-50">
-                <td className="px-2 py-1 border border-gray-100 sticky left-0 bg-white z-10 truncate">{s.color_name ?? '—'}</td>
-                <td className="px-2 py-1 border border-gray-100 sticky left-[92px] bg-white z-10 truncate">{s.size ?? '—'}</td>
-                <td className="px-2 py-1 border border-gray-100 font-mono sticky left-[148px] bg-white z-10 truncate">{s.sku_code ?? '—'}</td>
+            {data.skuPivot.map((s, ri) => {
+              const ex = excluded.has(s.sku_code ?? '');  // 集計不要SKU（Plan1で✔）→グレー＋品番合計から除外済み
+              return (
+              <tr key={s.sku_code ?? ri} className={`border-b border-gray-50 ${ex ? 'bg-gray-100 text-gray-400 line-through' : 'hover:bg-gray-50'}`}>
+                <td className={`px-2 py-1 border border-gray-100 sticky left-0 z-10 truncate ${ex ? 'bg-gray-100' : 'bg-white'}`}>{s.color_name ?? '—'}</td>
+                <td className={`px-2 py-1 border border-gray-100 sticky left-[92px] z-10 truncate ${ex ? 'bg-gray-100' : 'bg-white'}`}>{s.size ?? '—'}</td>
+                <td className={`px-2 py-1 border border-gray-100 font-mono sticky left-[148px] z-10 truncate ${ex ? 'bg-gray-100' : 'bg-white'}`}>{s.sku_code ?? '—'}{ex && ' ⊘'}</td>
                 {leaves.map((lf, i) => {
                   const v = sVal(s, lf);
-                  return <td key={i} className={`px-2 py-1 border border-gray-100 text-right tabular-nums ${v === 0 ? 'text-gray-300' : ''}`}>{v.toLocaleString('ja-JP')}</td>;
+                  return <td key={i} className={`px-2 py-1 border border-gray-100 text-right tabular-nums ${!ex && v === 0 ? 'text-gray-300' : ''}`}>{v.toLocaleString('ja-JP')}</td>;
                 })}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
