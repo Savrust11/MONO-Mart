@@ -270,7 +270,7 @@ export function ProductDashboardView({ code }: { code: string }) {
           <Kpi label="合計販売数" value={pick('合計販売数')} unit="点" icon={Package} color="indigo" />
           <Kpi label="平均売価(税抜)" value={pick('平均売価（税抜）')} unit="円" icon={Coins} color="blue" />
           <Kpi label="値引率" value={pick('合計値引率(%)')} unit="%" icon={Percent} color="amber" />
-          <Kpi label="粗利率" value={pick('合計粗利率(%)')} unit="%" icon={TrendingUp} color="rose" />
+          <Kpi label="粗利率" value={pick('合計粗利率(%)')} unit="%" icon={TrendingUp} color="rose" warnNegative badge="原価割れ" />
         </div>
       )}
 
@@ -351,21 +351,26 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 }
 
 function Kpi({
-  label, value, unit, icon: Icon, color,
+  label, value, unit, icon: Icon, color, warnNegative, badge,
 }: {
   label: string; value: string; unit: string; icon: any;
   color: 'indigo' | 'blue' | 'amber' | 'rose';
+  warnNegative?: boolean; badge?: string;
 }) {
   const map = {
     indigo: 'from-indigo-500 to-indigo-600', blue: 'from-blue-500 to-blue-600',
     amber: 'from-amber-500 to-amber-600', rose: 'from-rose-500 to-rose-600',
   };
+  const isNeg = warnNegative && parseFloat(value.replace(/,/g, '')) < 0;  // 原価割れ判定
   return (
     <div className="bg-white border border-gray-200 rounded p-3 relative overflow-hidden">
       <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${map[color]}`} />
       <div className="text-[11px] text-gray-500 flex items-center gap-1"><Icon className="w-3 h-3" />{label}</div>
-      <div className="text-xl font-bold text-gray-900 mt-1">
+      <div className={`text-xl font-bold mt-1 ${isNeg ? 'text-rose-600' : 'text-gray-900'}`}>
         {value}<span className="text-[11px] text-gray-400 font-normal ml-1">{unit}</span>
+        {isNeg && badge && (
+          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-bold align-middle">{badge}</span>
+        )}
       </div>
     </div>
   );

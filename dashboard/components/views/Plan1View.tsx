@@ -165,7 +165,8 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
         <Field label="商品タイプ" value={`${h.item_type_parent ?? '—'} / ${h.item_type_child ?? '—'}`} />
         <Field label="集計期間" value={`${d(h.start)} 〜 ${d(h.end)}`} />
         <Field label="累計レビュー" value={`${n(h.review_count)}件 / ${h.review_avg ?? '—'}点`} />
-        <Field label={`合計粗利率${totalLabel}`} value={hdr.margin == null ? '—' : `${hdr.margin}%`} />
+        <Field label={`合計粗利率${totalLabel}`} value={hdr.margin == null ? '—' : `${hdr.margin}%`}
+          warn={hdr.margin != null && hdr.margin < 0} badge="原価割れ" />
         <Field label={`合計値引率${totalLabel}`} value={hdr.discount == null ? '—' : `${hdr.discount}%`} />
         <Field label={`合計上代額${totalLabel}`} value={n(hdr.lst, '円')} />
         <Field label={`合計販売数${totalLabel}`} value={n(hdr.qty, '点')} />
@@ -315,11 +316,17 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
   );
 }
 
-function Field({ label, value, mono, span }: { label: string; value: string; mono?: boolean; span?: boolean }) {
+function Field({ label, value, mono, span, warn, badge }:
+  { label: string; value: string; mono?: boolean; span?: boolean; warn?: boolean; badge?: string }) {
   return (
     <div className={span ? 'col-span-2' : ''}>
       <span className="text-[11px] text-gray-400">{label}</span>
-      <div className={`font-medium text-gray-800 ${mono ? 'font-mono' : ''}`}>{value}</div>
+      <div className={`font-medium ${warn ? 'text-rose-600 font-bold' : 'text-gray-800'} ${mono ? 'font-mono' : ''}`}>
+        {value}
+        {warn && badge && (
+          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-bold align-middle">{badge}</span>
+        )}
+      </div>
     </div>
   );
 }
