@@ -25,8 +25,8 @@ export interface SimParams {
 
 export const DEFAULT_SIM_PARAMS: SimParams = {
   weeks:              8,
-  warningDays:        14,
-  overstockDays:      90,
+  warningDays:        90,   // 不足: 在庫日数 < 90日（通年品基準・顧客定義 2026）
+  overstockDays:      271,  // 過剰: 在庫日数 ≥ 271日（顧客定義 2026）
   seasonalMultiplier: 1.0,
 };
 
@@ -67,7 +67,7 @@ export function GlobalSimulationBar({ params, onChange }: Props) {
             </span>
           )}
           <span className="text-gray-500">
-            安全{params.weeks}週 / WARN ≤ {params.warningDays}日 / OVER &gt; {params.overstockDays}日
+            安全{params.weeks}週 / 不足 &lt; {params.warningDays}日 / 過剰 ≥ {params.overstockDays}日
             {params.seasonalMultiplier !== 1.0 && ` / 季節×${params.seasonalMultiplier.toFixed(2)}`}
           </span>
         </div>
@@ -98,31 +98,31 @@ export function GlobalSimulationBar({ params, onChange }: Props) {
           {/* WARNING 閾値 */}
           <div className="flex flex-col gap-1">
             <label className="font-semibold text-gray-700 flex justify-between">
-              <span>WARNING 閾値</span>
-              <span className="text-amber-600 font-mono">≤ {params.warningDays}日</span>
+              <span>不足 閾値</span>
+              <span className="text-amber-600 font-mono">&lt; {params.warningDays}日</span>
             </label>
             <input
-              type="range" min="3" max="30" step="1"
+              type="range" min="30" max="180" step="1"
               value={params.warningDays}
               onChange={(e) => update({ warningDays: parseInt(e.target.value, 10) })}
               className="w-full accent-amber-500"
             />
-            <div className="text-[10px] text-gray-500">在庫日数がこの値以下で WARNING 判定</div>
+            <div className="text-[10px] text-gray-500">在庫日数がこの値未満で「不足」判定（通年品=90日）</div>
           </div>
 
-          {/* OVERSTOCK 閾値 */}
+          {/* 過剰 閾値 */}
           <div className="flex flex-col gap-1">
             <label className="font-semibold text-gray-700 flex justify-between">
-              <span>OVERSTOCK 閾値</span>
-              <span className="text-blue-600 font-mono">&gt; {params.overstockDays}日</span>
+              <span>過剰 閾値</span>
+              <span className="text-blue-600 font-mono">≥ {params.overstockDays}日</span>
             </label>
             <input
-              type="range" min="30" max="180" step="5"
+              type="range" min="90" max="365" step="1"
               value={params.overstockDays}
               onChange={(e) => update({ overstockDays: parseInt(e.target.value, 10) })}
               className="w-full accent-blue-500"
             />
-            <div className="text-[10px] text-gray-500">在庫日数がこの値超で OVERSTOCK 判定</div>
+            <div className="text-[10px] text-gray-500">在庫日数がこの値以上で「過剰」判定（顧客定義=271日）</div>
           </div>
 
           {/* 季節係数 */}
@@ -176,8 +176,8 @@ export function recomputeRow(
   const stockDays = v7 > 0 ? free / v7 : null;
   let urgency: string;
   if (free <= 0) urgency = 'CRITICAL';
-  else if (stockDays !== null && stockDays <= params.warningDays) urgency = 'WARNING';
-  else if (stockDays !== null && stockDays > params.overstockDays) urgency = 'OVERSTOCK';
+  else if (stockDays !== null && stockDays < params.warningDays) urgency = 'WARNING';      // 不足: 90日未満
+  else if (stockDays !== null && stockDays >= params.overstockDays) urgency = 'OVERSTOCK'; // 過剰: 271日以上
   else urgency = 'OK';
   return {
     recommended_order_qty: recQty,

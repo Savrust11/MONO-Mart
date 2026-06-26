@@ -378,10 +378,12 @@ SELECT
       8 * 7 * daily_velocity_30d - free_inventory
   ) AS INT64))                                               AS recommended_order_qty,
 
+  -- 在庫ステータス（顧客定義 2026・通年品基準）: 欠品=フリー在庫≤0 / 不足=在庫日数<90 / 過剰=在庫日数≥271
+  -- ※季節品は本来シーズン期限前消化が基準だが、季節区分データ未整備のため暫定で通年90日を適用。
   CASE
     WHEN free_inventory <= 0 THEN 'CRITICAL'
-    WHEN SAFE_DIVIDE(free_inventory, NULLIF(daily_velocity_7d, 0)) <= 14 THEN 'WARNING'
-    WHEN SAFE_DIVIDE(free_inventory, NULLIF(daily_velocity_7d, 0)) > 90 THEN 'OVERSTOCK'
+    WHEN SAFE_DIVIDE(free_inventory, NULLIF(daily_velocity_7d, 0)) < 90 THEN 'WARNING'
+    WHEN SAFE_DIVIDE(free_inventory, NULLIF(daily_velocity_7d, 0)) >= 271 THEN 'OVERSTOCK'
     ELSE 'OK'
   END                                                        AS order_urgency,
 

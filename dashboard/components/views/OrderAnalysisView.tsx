@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { OrderAnalysisRow } from '@/lib/bigquery';
 import { ProductTable } from '@/components/ProductTable';
 import { KpiCard } from '@/components/KpiCard';
+import { StockStatusLegend } from '@/components/StockStatusLegend';
 import { GlobalSimulationBar, DEFAULT_SIM_PARAMS, recomputeRow, SimParams }
   from '@/components/GlobalSimulationBar';
 import { formatNumber, todayJST } from '@/lib/utils';
@@ -146,9 +147,14 @@ export function OrderAnalysisView() {
       {/* KPI summary (reflects simulated values) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
         <KpiCard label="欠品SKU"        value={formatNumber(criticalCount)}  accent="red"     sub="フリー在庫≤0" />
-        <KpiCard label="警告SKU"        value={formatNumber(warningCount)}   accent="amber"   sub={`在庫日数 ≤ ${simParams.warningDays}日`} />
-        <KpiCard label="過剰在庫SKU"    value={formatNumber(overstockCount)} accent="blue"    sub={`在庫日数 > ${simParams.overstockDays}日`} />
+        <KpiCard label="不足SKU"        value={formatNumber(warningCount)}   accent="amber"   sub={`在庫日数 < ${simParams.warningDays}日`} />
+        <KpiCard label="過剰在庫SKU"    value={formatNumber(overstockCount)} accent="blue"    sub={`在庫日数 ≥ ${simParams.overstockDays}日`} />
         <KpiCard label="合計推奨発注数" value={formatNumber(totalOrderQty)}  accent="default" sub={`安全${simParams.weeks}週ベース`} />
+      </div>
+
+      {/* 在庫ステータスの判定基準（社内共有・日本語）*/}
+      <div className="mb-4">
+        <StockStatusLegend />
       </div>
 
       {/* Product table */}
