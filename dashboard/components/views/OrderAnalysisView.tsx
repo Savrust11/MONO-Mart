@@ -5,6 +5,7 @@ import { OrderAnalysisRow } from '@/lib/bigquery';
 import { ProductTable } from '@/components/ProductTable';
 import { KpiCard } from '@/components/KpiCard';
 import { StockStatusLegend } from '@/components/StockStatusLegend';
+import { CircularProgress } from '@/components/CircularProgress';
 import { GlobalSimulationBar, DEFAULT_SIM_PARAMS, recomputeRow, SimParams }
   from '@/components/GlobalSimulationBar';
 import { formatNumber, todayJST } from '@/lib/utils';
@@ -22,6 +23,8 @@ export function OrderAnalysisView() {
   const [error, setError]         = useState<string | null>(null);
   const [urgencyFilter, setUrgencyFilter] = useState<string>('');
   const [simParams, setSimParams] = useState<SimParams>(DEFAULT_SIM_PARAMS);
+  const [busy, setBusy] = useState(true);          // 初回ロード中は円形プログレスを表示
+  const [loadedOnce, setLoadedOnce] = useState(false);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -38,6 +41,7 @@ export function OrderAnalysisView() {
       setError(String(err));
     } finally {
       setIsLoading(false);
+      setLoadedOnce(true);
     }
   }, [date, urgencyFilter]);
 
@@ -80,6 +84,13 @@ export function OrderAnalysisView() {
   const warningCount   = simulatedRows.filter((r) => r.order_urgency === 'WARNING').length;
   const overstockCount = simulatedRows.filter((r) => r.order_urgency === 'OVERSTOCK').length;
   const totalOrderQty  = simulatedRows.reduce((s, r) => s + (r.recommended_order_qty || 0), 0);
+
+  // 初回ロードは円形プログレスを100%まで見せてから本体表示（他画面と同パターン）
+  if (busy) return (
+    <div className="px-6 py-4">
+      <CircularProgress active={!loadedOnce} label="発注推奨データを集計中" onDone={() => setBusy(false)} />
+    </div>
+  );
 
   return (
     <div className="px-6 py-4">
