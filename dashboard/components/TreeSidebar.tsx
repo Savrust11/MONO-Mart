@@ -11,59 +11,64 @@ interface TreeItem {
   children?: { label: string; href: string }[];
 }
 
+// 分析タブのツリー（/dashboard/analytics と /dashboard/seasonal で共用）
+const ANALYTICS_TREE: TreeItem[] = [
+  {
+    label: '併売分析',
+    children: [
+      { label: '同一品番併売',  href: '/dashboard/analytics?view=cross-buy' },
+      { label: 'ブランド間併売', href: '/dashboard/analytics?view=brand-cross' },
+      { label: 'カテゴリ間併売', href: '/dashboard/analytics?view=category-cross' },
+    ],
+  },
+  {
+    label: '売上分析',
+    children: [
+      { label: '日別売上推移',  href: '/dashboard/analytics?view=daily-sales' },
+      { label: 'カテゴリ別売上', href: '/dashboard/analytics?view=cat-sales' },
+      { label: '品番別売上',    href: '/dashboard/analytics?view=sku-sales' },
+    ],
+  },
+  {
+    label: '在庫分析',
+    children: [
+      { label: '在庫消化予測', href: '/dashboard/analytics?view=stock-forecast' },
+      { label: '不動在庫分析', href: '/dashboard/analytics?view=dead-stock' },
+    ],
+  },
+  {
+    label: 'リピート分析',
+    children: [
+      { label: 'リピートシミュレーション', href: '/dashboard/analytics?view=repeat-sim' },
+      { label: '発注推奨データ',          href: '/dashboard/analytics?view=order-recommend' },
+      { label: 'リピート発注表作成',      href: '/dashboard/analytics?view=repeat-order' },
+      { label: '52週 季節係数',           href: '/dashboard/seasonal' },
+    ],
+  },
+  {
+    label: 'MD計画',
+    children: [
+      { label: 'MD計画・提案', href: '/dashboard/analytics?view=md-plan' },
+    ],
+  },
+  {
+    label: 'ダッシュボード',
+    children: [
+      { label: '商品ダッシュボード', href: '/dashboard/product' },
+    ],
+  },
+  {
+    label: 'システム監視',
+    children: [
+      { label: 'データ取得状況', href: '/dashboard/ingestion' },
+    ],
+  },
+];
+
 // Tree per top-tab section. Renders the section matching current path prefix.
 const TREES: Record<string, TreeItem[]> = {
-  '/dashboard/analytics': [
-    {
-      label: '併売分析',
-      children: [
-        { label: '同一品番併売',  href: '/dashboard/analytics?view=cross-buy' },
-        { label: 'ブランド間併売', href: '/dashboard/analytics?view=brand-cross' },
-        { label: 'カテゴリ間併売', href: '/dashboard/analytics?view=category-cross' },
-      ],
-    },
-    {
-      label: '売上分析',
-      children: [
-        { label: '日別売上推移',  href: '/dashboard/analytics?view=daily-sales' },
-        { label: 'カテゴリ別売上', href: '/dashboard/analytics?view=cat-sales' },
-        { label: '品番別売上',    href: '/dashboard/analytics?view=sku-sales' },
-      ],
-    },
-    {
-      label: '在庫分析',
-      children: [
-        { label: '在庫消化予測', href: '/dashboard/analytics?view=stock-forecast' },
-        { label: '不動在庫分析', href: '/dashboard/analytics?view=dead-stock' },
-      ],
-    },
-    {
-      label: 'リピート分析',
-      children: [
-        { label: 'リピートシミュレーション', href: '/dashboard/analytics?view=repeat-sim' },
-        { label: '発注推奨データ',          href: '/dashboard/analytics?view=order-recommend' },
-        { label: 'リピート発注表作成',      href: '/dashboard/analytics?view=repeat-order' },
-      ],
-    },
-    {
-      label: 'MD計画',
-      children: [
-        { label: 'MD計画・提案', href: '/dashboard/analytics?view=md-plan' },
-      ],
-    },
-    {
-      label: 'ダッシュボード',
-      children: [
-        { label: '商品ダッシュボード', href: '/dashboard/product' },
-      ],
-    },
-    {
-      label: 'システム監視',
-      children: [
-        { label: 'データ取得状況', href: '/dashboard/ingestion' },
-      ],
-    },
-  ],
+  '/dashboard/analytics': ANALYTICS_TREE,
+  '/dashboard/seasonal': ANALYTICS_TREE,
   '/dashboard/product': [
     {
       label: '併売分析',
