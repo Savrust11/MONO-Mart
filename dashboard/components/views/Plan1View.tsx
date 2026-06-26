@@ -21,8 +21,8 @@ function HoverTip({ children, title, rows, accent }:
   };
   const head = accent === 'amber' ? 'text-amber-700' : 'text-indigo-700';
   const bar = accent === 'amber' ? 'bg-amber-400' : 'bg-indigo-400';
+  // 負マージン+パディングでセルのpx-1 py-1まで覆い、背景全体をホバー対象にする
   return (
-    {/* 負マージン+パディングでセルのpx-1 py-1まで覆い、背景全体をホバー対象にする */}
     <span onMouseEnter={enter} onMouseMove={move} onMouseLeave={leave}
       className="cursor-help block w-full h-full -mx-1 -my-1 px-1 py-1">
       {children}
