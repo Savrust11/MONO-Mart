@@ -88,6 +88,12 @@ export async function fetchPlan2(pc: string, start: string, end: string): Promis
   const daysOfYear: Record<string, string[]> = {};
   for (const d of allDays) (daysOfYear[d.slice(0, 4)] ??= []).push(d);
 
+  // 品番のケースを保存通りに正規化（在庫/入荷系は product_code=@pc がケース依存のため）。
+  const canonRow = (await q(
+    `SELECT ANY_VALUE(product_code) p FROM ${T('product_master')} WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc))`,
+    { pc }))[0];
+  if (canonRow?.p) pc = canonRow.p;
+
   const [ordRows, uuRows, costRows, incRows, stkRows, cdaysRows, exclRows, pivRows] = await Promise.all([
     // 日次 受注（販売数/売上/上代/予約販売数）
     q(`SELECT CAST(sale_date AS STRING) d, SUM(sales_quantity) qty, SUM(sales_amount) rev,

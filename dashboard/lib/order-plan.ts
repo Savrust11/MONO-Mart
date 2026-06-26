@@ -116,6 +116,13 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
   const asof: string = dval(asofRow?.d) ?? today;
   const dl30 = addDays(asof, -(WIN_LONG - 1));
 
+  // 品番のケースを保存通りに正規化。在庫/入荷/予約系クエリは product_code=@pc（ケース依存）
+  // のため、入力ケースが違うと在庫=0になる不具合を防ぐ（販売系は UPPER(TRIM) 済み）。
+  const canonRow = (await q(
+    `SELECT ANY_VALUE(product_code) p FROM ${T('product_master')} WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc))`,
+    { pc }))[0];
+  if (canonRow?.p) pc = canonRow.p;
+
   // ── 販売開始日（確定№2）: 期間内初回受注日 ──
   const sd0 = (await q(
     `SELECT MIN(sale_date) d FROM ${T('sales_daily')} WHERE product_code=@pc AND source_file='orders'

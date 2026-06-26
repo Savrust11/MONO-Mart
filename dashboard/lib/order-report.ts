@@ -62,6 +62,12 @@ export async function fetchPeriodReport(pc: string, start: string, end: string):
   const asof: string = asofRow?.d ?? today;
   const dL = addDays(asof, -(WIN_LONG - 1));
 
+  // 品番のケースを保存通りに正規化（在庫/入荷/予約系は product_code=@pc がケース依存のため）。
+  const canonRow = (await q(
+    `SELECT ANY_VALUE(product_code) p FROM ${T('product_master')} WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc))`,
+    { pc }))[0];
+  if (canonRow?.p) pc = canonRow.p;
+
   // ── 受注期間集計（SKU単位）＋原価（PF品番→MMS SKU）R14/R15/R25/R71/R73 ──
   const sku = await q(
     `WITH s AS (
