@@ -1,7 +1,53 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { CircularProgress } from '../CircularProgress';
+
+// 遅延付きツールチップ。マウスを乗せて少し経つと、整形した内容をふわっと表示する。
+function HoverTip({ children, title, rows, accent }:
+  { children: React.ReactNode; title: string; rows: [string, string][]; accent: 'indigo' | 'amber' }) {
+  const [show, setShow] = useState(false);     // 表示するか
+  const [render, setRender] = useState(false); // DOMに載せるか（フェード後に外す）
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const move = (e: React.MouseEvent) => setPos({ x: e.clientX, y: e.clientY });
+  const enter = (e: React.MouseEvent) => {
+    move(e);
+    timer.current = setTimeout(() => { setRender(true); requestAnimationFrame(() => setShow(true)); }, 450);
+  };
+  const leave = () => {
+    if (timer.current) clearTimeout(timer.current);
+    setShow(false); setTimeout(() => setRender(false), 150);
+  };
+  const head = accent === 'amber' ? 'text-amber-700' : 'text-indigo-700';
+  const bar = accent === 'amber' ? 'bg-amber-400' : 'bg-indigo-400';
+  return (
+    <span onMouseEnter={enter} onMouseMove={move} onMouseLeave={leave} className="cursor-help">
+      {children}
+      {render && (
+        <div
+          style={{ position: 'fixed', left: pos.x + 14, top: pos.y + 16, zIndex: 60 }}
+          className={`pointer-events-none transition-opacity duration-150 ${show ? 'opacity-100' : 'opacity-0'}`}
+        >
+          <div className="bg-white text-gray-800 text-[12px] rounded-lg shadow-xl border border-gray-200 overflow-hidden w-64">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+              <span className={`inline-block w-1.5 h-4 rounded-sm ${bar}`} />
+              <span className={`font-bold ${head}`}>{title}</span>
+            </div>
+            <div className="px-3 py-2 space-y-1.5">
+              {rows.map(([k, v]) => (
+                <div key={k} className="flex gap-2">
+                  <span className="text-gray-400 w-16 shrink-0">{k}</span>
+                  <span className="font-medium text-gray-700 leading-snug">{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
 
 // 発注管理表「期間集計」(旧:案1・SKU別明細ビュー)。/api/order-plan1 のレスポンス型。
 interface Plan1Sku {
@@ -289,11 +335,15 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
                 <Td>{d(s.last_order_date)}</Td><Td num>{n(s.last_cost)}</Td><Td num>{n(s.latest_avg_cost)}</Td>
                 <Td>{d(s.last_arrival_date)}</Td><Td num>{n(s.current_stock)}</Td>
                 <Td num cls={`font-semibold ${s.velo_basis === 'simulated' ? 'bg-amber-50 text-amber-700' : 'bg-indigo-50 text-indigo-800'}`}>
-                  <span title={s.velo_basis === 'simulated'
-                    ? `シミュレーション値（7日実績なし→経過係数で推定）／補正日販=${s.corrected_velo}`
-                    : `実数ベース（欠品日を除外した7日平均×季節係数）／補正日販=${s.corrected_velo}`}>
+                  <HoverTip
+                    accent={s.velo_basis === 'simulated' ? 'amber' : 'indigo'}
+                    title={s.velo_basis === 'simulated' ? 'シミュレーション値' : '実数ベース'}
+                    rows={s.velo_basis === 'simulated'
+                      ? [['区分', 'シミュレーション ▲'], ['補正日販', `${s.corrected_velo} 枚/日`], ['算出', '7日実績なし → ブランド経過係数で定常日販を推定 × 季節係数']]
+                      : [['区分', '実数ベース'], ['補正日販', `${s.corrected_velo} 枚/日`], ['算出', '欠品日を除いた通常販売の7日平均 × 季節係数（知りたい週÷実績週）']]}
+                  >
                     {n(s.recommended_qty)}{s.velo_basis === 'simulated' && <span className="ml-0.5 text-[9px]">▲</span>}
-                  </span>
+                  </HoverTip>
                 </Td>
                 <Td cls="bg-indigo-50">
                   <input type="number" min={0}
