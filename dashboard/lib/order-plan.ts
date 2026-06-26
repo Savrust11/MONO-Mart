@@ -65,6 +65,8 @@ export interface Plan1Sku {
   last_arrival_date: string | null;  // 最終入荷日
   current_stock: number;             // 現在庫数（予約は0）
   recommended_qty: number | null;    // 推奨発注数（暫定式）
+  corrected_velo: number;            // 欠品補正された日販（実数 or シミュ）
+  velo_basis: 'actual' | 'simulated'; // 補正日販が実数か推定か（色分け用）
   recommended_provisional: boolean;
   confirmed_qty: null;               // 確定発注数（入力欄・空白）
   // 直近7日
@@ -137,6 +139,7 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
   const [
     skuMaster, periodSales, colorSales, stockRows, dailySku, dailyStk,
     arrRows, lastOrd, costRows, resvRows, incRemain, arrivals, header, imgRows, pfRows,
+    seasonalRows, elapsedRows, firstSaleRows,
   ] = await Promise.all([
     // SKUマスタ（product_master 起点で全登録SKU）
     q(`SELECT UPPER(TRIM(sku_code)) sk, ANY_VALUE(color_name) color_name, ANY_VALUE(size) size,
@@ -161,8 +164,9 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
          SUM(sa.favorites) fav
        FROM ${T('stock_analysis')} sa LEFT JOIN pm ON pm.sk=UPPER(TRIM(sa.sku_code))
        WHERE sa.product_code=@pc AND sa.snapshot_date=(SELECT d FROM latest) GROUP BY sk`, { pc, asof }),
-    // 日次SKU販売（30日窓）→ 7日/30日 集計・中央値
-    q(`SELECT UPPER(TRIM(sku_code)) sk, CAST(sale_date AS STRING) d, SUM(sales_quantity) q
+    // 日次SKU販売（30日窓）→ 7日/30日 集計・中央値。qn=予約を除く通常販売（欠品補正の7日平均用）
+    q(`SELECT UPPER(TRIM(sku_code)) sk, CAST(sale_date AS STRING) d, SUM(sales_quantity) q,
+         SUM(IF(sale_type LIKE '%予約%', 0, sales_quantity)) qn
        FROM ${T('sales_daily')} WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc)) AND source_file='orders'
          AND sale_date BETWEEN DATE(@dl) AND DATE(@asof) GROUP BY sk,d`, { pc, dl: dl30, asof }),
     // 日次SKU在庫（30日窓）→ 中央値ルール
@@ -215,8 +219,52 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
     q(`SELECT ANY_VALUE(cost_price) val FROM ${T('pf_fee_master')}
        WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc))
          AND snapshot_date=(SELECT MAX(snapshot_date) FROM ${T('pf_fee_master')}) AND cost_price>0`, { pc }),
+    // 季節係数（この品番の gender×商品タイプ子の52週）— 欠品補正の「知りたい週÷実績週」用
+    q(`WITH a AS (SELECT ANY_VALUE(gender) g, ANY_VALUE(child_item_type) ct
+                  FROM ${T('product_master')} WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc)))
+       SELECT sc.week_number wk, sc.coefficient c FROM ${T('seasonal_coefficients')} sc, a
+       WHERE sc.gender=a.g AND sc.child_item_type=a.ct`, { pc }),
+    // 経過係数（このブランドのリリース経過日カーブ）— 7日実績が無い新商品のフォールバック用
+    q(`WITH a AS (SELECT parent_category brand FROM ${T('sales_daily')}
+                  WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc)) AND parent_category IS NOT NULL
+                    AND parent_category NOT LIKE '%限定%' ORDER BY sale_date DESC LIMIT 1)
+       SELECT ec.days_since_release d, ec.coefficient c FROM ${T('elapsed_coefficients')} ec, a
+       WHERE ec.brand=a.brand`, { pc }),
+    // 初回受注日（リリース日）SKU別 — リリース経過日数の算出用
+    q(`SELECT UPPER(TRIM(sku_code)) sk, CAST(MIN(sale_date) AS STRING) d
+       FROM ${T('sales_daily')} WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc)) AND source_file='orders'
+       GROUP BY sk`, { pc }),
   ]);
   const pfCost = pfRows[0]?.val == null ? null : num(pfRows[0].val);
+
+  // ── 欠品補正の係数マップ ──
+  const seasonalByWeek: Record<number, number> = {};
+  for (const r of seasonalRows) seasonalByWeek[Number(r.wk)] = num(r.c);
+  const elapsedByDay: Record<number, number> = {};
+  for (const r of elapsedRows) elapsedByDay[Number(r.d)] = num(r.c);
+  const firstSaleMap: Record<string, string | null> = {};
+  for (const r of firstSaleRows) firstSaleMap[r.sk] = dval(r.d);
+  const isoWeek = (iso: string): number => {  // ISO週番号（1..53）
+    const dt = new Date(iso + 'T00:00:00Z');
+    const day = (dt.getUTCDay() + 6) % 7;
+    dt.setUTCDate(dt.getUTCDate() - day + 3);
+    const firstTh = new Date(Date.UTC(dt.getUTCFullYear(), 0, 4));
+    const fday = (firstTh.getUTCDay() + 6) % 7;
+    firstTh.setUTCDate(firstTh.getUTCDate() - fday + 3);
+    return 1 + Math.round((dt.getTime() - firstTh.getTime()) / 604800000);
+  };
+  // 実績週=asofの週、知りたい週=発注がカバーする先 COVERAGE_WEEKS 週の平均。比率=知りたい/実績。
+  const wkClamp = (w: number) => ((w - 1) % 52) + 1;
+  const refWeek = wkClamp(isoWeek(asof));
+  const seasonalRef = seasonalByWeek[refWeek] || null;
+  let seasonalTgt: number | null = null;
+  {
+    const ws: number[] = [];
+    for (let i = 1; i <= COVERAGE_WEEKS; i++) { const c = seasonalByWeek[wkClamp(refWeek + i)]; if (c) ws.push(c); }
+    if (ws.length) seasonalTgt = ws.reduce((a, b) => a + b, 0) / ws.length;
+  }
+  // 季節比率（知りたい週÷実績週）。両週の係数が揃わない時は補正なし=1.0。
+  const seasonalRatio = (seasonalRef && seasonalTgt) ? seasonalTgt / seasonalRef : 1.0;
 
   // 商品画像（カラー別）
   const images: Plan1Image[] = imgRows
@@ -238,9 +286,10 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
   const resvMap = m(resvRows, (r) => num(r.q));
   const incMap = m(incRemain, (r) => num(r.q));
 
-  // 日次（SKU×日）→ 辞書
+  // 日次（SKU×日）→ 辞書。dskNorm=予約を除く通常販売（欠品補正の7日平均用）
   const dsk: Record<string, Record<string, number>> = {};
-  for (const r of dailySku) (dsk[r.sk] ??= {})[r.d] = num(r.q);
+  const dskNorm: Record<string, Record<string, number>> = {};
+  for (const r of dailySku) { (dsk[r.sk] ??= {})[r.d] = num(r.q); (dskNorm[r.sk] ??= {})[r.d] = num(r.qn); }
   const dst: Record<string, Record<string, number>> = {};
   for (const r of dailyStk) (dst[r.sk] ??= {})[r.d] = num(r.s);
 
@@ -296,8 +345,34 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
     const velo30 = l30Qty / WIN_LONG;
     const freeDays = velo30 ? r1(free / velo30) : null;
 
-    // 推奨発注数（⚠ 暫定式・スプシ未定義）= MAX(0, CEIL(8週×7日×30日平均日販 − フリー在庫))
-    const recommended = Math.max(0, Math.ceil(COVERAGE_WEEKS * 7 * velo30 - free));
+    // ── 欠品補正された日販（顧客・欠品補正仕様）──
+    //  実数: 「予約になる前の通常販売」7日平均（在庫があった日のみ＝欠品日を除外）× 季節係数(知りたい週÷実績週)
+    //  シミュ: 7日実績が無ければ ブランド経過係数で定常日販を推定 × 季節係数
+    const norm7Days = daysS.filter((d) => (dst[sk]?.[d] ?? 0) > 0);          // 在庫があった日のみ
+    const norm7Sum = norm7Days.reduce((a, d) => a + (dskNorm[sk]?.[d] ?? 0), 0);
+    const l30NormQty = daysL.reduce((a, d) => a + (dskNorm[sk]?.[d] ?? 0), 0); // 30日の通常販売累計
+    let correctedVelo: number;
+    let veloBasis: 'actual' | 'simulated';
+    if (norm7Days.length > 0 && l30NormQty > 0) {
+      // 実数ベース: 欠品日を除いた通常販売の日販 × 季節比率
+      correctedVelo = (norm7Sum / norm7Days.length) * seasonalRatio;
+      veloBasis = 'actual';
+    } else {
+      // シミュレーション: 経過係数で定常日販を推定（累計 ÷ 経過日までの係数和）× 季節比率
+      const fs = firstSaleMap[sk];
+      const dSince = fs ? Math.max(1, daysBetween(fs, asof) + 1) : null;
+      let steady = velo30; // フォールバック（経過係数が無い場合）
+      if (dSince) {
+        let sumCoef = 0;
+        for (let k = 1; k <= Math.min(dSince, WIN_LONG); k++) sumCoef += elapsedByDay[k] ?? 0;
+        if (sumCoef > 0) steady = l30NormQty / sumCoef;
+      }
+      correctedVelo = steady * seasonalRatio;
+      veloBasis = 'simulated';
+    }
+
+    // 推奨発注数 = MAX(0, CEIL(8週×7日×補正日販 − フリー在庫))。補正日販は欠品/季節を考慮。
+    const recommended = Math.max(0, Math.ceil(COVERAGE_WEEKS * 7 * correctedVelo - free));
 
     return {
       color_name: color, size: sm.size ?? ps?.sz ?? null, sku_code: sk === '' ? null : sk,
@@ -308,7 +383,7 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
       last_order_date: ordMap[sk]?.od ?? null, last_cost: ordMap[sk]?.up ?? null,
       latest_avg_cost: costMap[sk] ?? null, last_arrival_date: arrMap[sk] ?? null,
       current_stock: cur, recommended_qty: recommended, recommended_provisional: true,
-      confirmed_qty: null,
+      corrected_velo: r2(correctedVelo), velo_basis: veloBasis, confirmed_qty: null,
       s7_qty: s7Qty, s7_daily_avg: s7Avg, s7_stock_days: s7Days, s7_sellout: s7Sellout,
       l30_qty: l30Qty, l30_daily_median: l30Med, l30_stock_days: l30Days, l30_sellout: l30Sellout,
       free_stock: free, free_stock_days: freeDays, reserved_pending: reserved,

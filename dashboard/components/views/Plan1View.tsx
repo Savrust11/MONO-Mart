@@ -11,6 +11,7 @@ interface Plan1Sku {
   last_order_date: string | null; last_cost: number | null; latest_avg_cost: number | null;
   last_arrival_date: string | null; current_stock: number;
   recommended_qty: number | null; recommended_provisional: boolean; confirmed_qty: null;
+  corrected_velo: number; velo_basis: 'actual' | 'simulated';
   s7_qty: number; s7_daily_avg: number | null; s7_stock_days: number | null; s7_sellout: string | null;
   l30_qty: number; l30_daily_median: number | null; l30_stock_days: number | null; l30_sellout: string | null;
   free_stock: number; free_stock_days: number | null; reserved_pending: number;
@@ -225,6 +226,13 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
         )}
       </div>
 
+      {/* 推奨発注数の色分け凡例（顧客・欠品補正: 実数とシミュレーションを判別）*/}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
+        <span className="font-medium text-gray-600">推奨発注数の色:</span>
+        <span className="inline-flex items-center gap-1"><span className="inline-block w-3.5 h-3.5 rounded-sm bg-indigo-50 border border-indigo-200" />実数ベース（欠品日を除いた7日平均×季節係数）</span>
+        <span className="inline-flex items-center gap-1"><span className="inline-block w-3.5 h-3.5 rounded-sm bg-amber-50 border border-amber-200" />シミュレーション（▲＝7日実績なし→経過係数で推定）</span>
+      </div>
+
       {/* SKU別明細（横スクロール） */}
       <div className="bg-white border border-gray-200 rounded overflow-x-auto">
         <table className="text-[12px] whitespace-nowrap border-collapse">
@@ -280,7 +288,13 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
                 <Td num>{s.fku_share == null ? '—' : `${Math.round(s.fku_share * 100)}%`}</Td>
                 <Td>{d(s.last_order_date)}</Td><Td num>{n(s.last_cost)}</Td><Td num>{n(s.latest_avg_cost)}</Td>
                 <Td>{d(s.last_arrival_date)}</Td><Td num>{n(s.current_stock)}</Td>
-                <Td num cls="bg-indigo-50 font-semibold">{n(s.recommended_qty)}</Td>
+                <Td num cls={`font-semibold ${s.velo_basis === 'simulated' ? 'bg-amber-50 text-amber-700' : 'bg-indigo-50 text-indigo-800'}`}>
+                  <span title={s.velo_basis === 'simulated'
+                    ? `シミュレーション値（7日実績なし→経過係数で推定）／補正日販=${s.corrected_velo}`
+                    : `実数ベース（欠品日を除外した7日平均×季節係数）／補正日販=${s.corrected_velo}`}>
+                    {n(s.recommended_qty)}{s.velo_basis === 'simulated' && <span className="ml-0.5 text-[9px]">▲</span>}
+                  </span>
+                </Td>
                 <Td cls="bg-indigo-50">
                   <input type="number" min={0}
                     value={confirmed[s.sku_code ?? ''] ?? ''}
