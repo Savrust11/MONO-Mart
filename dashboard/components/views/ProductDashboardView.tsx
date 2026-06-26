@@ -226,8 +226,8 @@ export function ProductDashboardView({ code }: { code: string }) {
 
           <div>
             <label className="block text-[11px] text-gray-500 mb-1"
-              title="入荷予定日が「今日＋N日」より先の入荷分は、フリー在庫に含めません（過大計上→過小発注を防止）。既定180日。">
-              基準日数 N（入荷除外）
+              title="入荷予定日が「今日＋N日」より後（＝来シーズン等の先の入荷）はフリー在庫に含めません。近い入荷だけを在庫として扱い、過大計上→過小発注を防ぎます。既定180日。">
+              基準日数 N（来シーズン除外）
             </label>
             <input type="number" min={0} value={cutoffN} placeholder="180"
               onChange={(e) => setCutoffN(e.target.value)}
