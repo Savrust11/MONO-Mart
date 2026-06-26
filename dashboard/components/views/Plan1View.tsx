@@ -104,17 +104,29 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
       })();
   const totalLabel = excluded.size > 0 ? `（集計対象 ${activeRows.length}/${data.skus.length} SKU）` : '';
 
-  // 総数指定→SKU配分（⚠暫定: 30日販売数構成比＋最大剰余法。配分基準はスプシ未定義のため要確認）
-  const alloc: Record<string, number> = {};
-  if (totalQty > 0 && activeRows.length) {
-    const w = activeRows.map((s) => Math.max(s.l30_qty || 0, 0));
-    const sumW = w.reduce((a, b) => a + b, 0);
-    const raw = activeRows.map((_, i) => (sumW > 0 ? totalQty * (w[i] / sumW) : totalQty / activeRows.length));
+  // 総数指定→SKU配分（顧客回答 2026: 「不足ベース」と「構成比ベース」を両方表示）。
+  //  ・不足ベース   = 各SKUの不足(推奨発注数=需要−残在庫)の比率で総数を配分。
+  //                   →定番カラー等は売れていても在庫が充足なら配分が小さくなる（顧客指摘どおり）。
+  //  ・構成比ベース = 直近30日販売数の構成比で総数を配分（純粋な人気度）。
+  //  端数は最大剰余法で総数に厳密一致させる。
+  const distribute = (weights: number[]): number[] => {
+    const sumW = weights.reduce((a, b) => a + b, 0);
+    const raw = weights.map((wi) => (sumW > 0 ? totalQty * (wi / sumW) : totalQty / weights.length));
     const floor = raw.map(Math.floor);
     let residual = totalQty - floor.reduce((a, b) => a + b, 0);
     raw.map((r, i) => ({ i, f: r - Math.floor(r) })).sort((a, b) => b.f - a.f)
       .forEach(({ i }) => { if (residual-- > 0) floor[i] += 1; });
-    activeRows.forEach((s, i) => { alloc[s.sku_code ?? ''] = floor[i]; });
+    return floor;
+  };
+  const allocShort: Record<string, number> = {};   // 不足ベース
+  const allocSales: Record<string, number> = {};   // 構成比ベース
+  if (totalQty > 0 && activeRows.length) {
+    const shortW = distribute(activeRows.map((s) => Math.max(s.recommended_qty || 0, 0)));
+    const salesW = distribute(activeRows.map((s) => Math.max(s.l30_qty || 0, 0)));
+    activeRows.forEach((s, i) => {
+      allocShort[s.sku_code ?? ''] = shortW[i];
+      allocSales[s.sku_code ?? ''] = salesW[i];
+    });
   }
 
   // #3 入荷山を「日付ごと」に整列（左詰めをやめる）。全SKUの入荷予定日を集めて列に並べ、
@@ -125,7 +137,7 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
     return Array.from(set).sort();
   })();
   // テーブル総列数（除外行の colSpan 用）。先頭4列（集計不要/カラー/サイズ/SKU品番）以外をまとめる。
-  const COLS = 16 + (totalQty > 0 ? 1 : 0) + 4 + 4 + 3 + Math.max(1, arrivalDates.length);
+  const COLS = 16 + (totalQty > 0 ? 2 : 0) + 4 + 4 + 3 + Math.max(1, arrivalDates.length);
   // 顧客#6: 全SKUが「集計不要」のカラーは、画像を2段目（集計対象外・斜線/グレー）へ移す。
   const excludedColors = new Set(
     Array.from(new Set(data.skus.map((s) => s.color_name).filter((c): c is string => !!c)))
@@ -217,7 +229,7 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
         <table className="text-[12px] whitespace-nowrap border-collapse">
           <thead>
             <tr className="text-gray-600 text-[11px]">
-              <th colSpan={16 + (totalQty > 0 ? 1 : 0)} className="px-2 py-1 border border-gray-200 bg-gray-50 text-left">▼指定期間合計</th>
+              <th colSpan={16 + (totalQty > 0 ? 2 : 0)} className="px-2 py-1 border border-gray-200 bg-gray-50 text-left">▼指定期間合計</th>
               <th colSpan={4} className="px-2 py-1 border border-gray-200 bg-sky-100 text-center">▼直近7日</th>
               <th colSpan={4} className="px-2 py-1 border border-gray-200 bg-teal-100 text-center">▼直近30日</th>
               <th colSpan={3} className="px-2 py-1 border border-gray-200 bg-violet-100 text-center">フリー在庫・予約</th>
@@ -228,7 +240,8 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
               <Th>お気に入り</Th><Th>販売数</Th><Th>FKU構成</Th><Th>前回発注日</Th><Th>前回原価</Th>
               <Th>最新加重平均原価</Th><Th>最終入荷日</Th><Th>現在庫数</Th>
               <Th cls="bg-indigo-50">推奨発注数</Th><Th cls="bg-indigo-50">確定発注数</Th>
-              {totalQty > 0 && <Th cls="bg-indigo-100">配分数（暫定）</Th>}
+              {totalQty > 0 && <Th cls="bg-indigo-100" title="総数を各SKUの不足(需要−残在庫)の比率で配分。在庫が充足な色は小さくなる">配分数（不足ベース）</Th>}
+              {totalQty > 0 && <Th cls="bg-purple-100" title="総数を直近30日の販売構成比で配分（人気度ベース）">配分数（構成比）</Th>}
               <Th cls="bg-sky-50">7日販売数</Th><Th cls="bg-sky-50">日販平均</Th><Th cls="bg-sky-50">在庫日数</Th><Th cls="bg-sky-50">完売想定日</Th>
               <Th cls="bg-teal-50">30日販売数</Th><Th cls="bg-teal-50">日販中央値</Th><Th cls="bg-teal-50">在庫日数</Th><Th cls="bg-teal-50">完売想定日</Th>
               <Th cls="bg-violet-50">フリー在庫数</Th><Th cls="bg-violet-50">フリー在庫日数</Th><Th cls="bg-violet-50">予約未処理</Th>
@@ -274,7 +287,8 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
                     onChange={(e) => setConfirmed((p) => ({ ...p, [s.sku_code ?? '']: e.target.value }))}
                     className="w-16 px-1 py-0.5 border border-gray-300 rounded text-right text-[12px]" />
                 </Td>
-                {totalQty > 0 && <Td num cls="bg-indigo-100 font-semibold">{n(alloc[s.sku_code ?? ''] ?? 0)}</Td>}
+                {totalQty > 0 && <Td num cls="bg-indigo-100 font-semibold">{n(allocShort[s.sku_code ?? ''] ?? 0)}</Td>}
+                {totalQty > 0 && <Td num cls="bg-purple-100 font-semibold">{n(allocSales[s.sku_code ?? ''] ?? 0)}</Td>}
                 <Td num cls="bg-sky-50">{n(s.s7_qty)}</Td><Td num cls="bg-sky-50">{s.s7_daily_avg ?? '—'}</Td>
                 <Td num cls="bg-sky-50">{s.s7_stock_days == null ? '—' : `${s.s7_stock_days}日`}</Td><Td cls="bg-sky-50">{d(s.s7_sellout)}</Td>
                 <Td num cls="bg-teal-50">{n(s.l30_qty)}</Td><Td num cls="bg-teal-50">{s.l30_daily_median ?? '—'}</Td>
@@ -309,8 +323,8 @@ function Field({ label, value, mono, span }: { label: string; value: string; mon
     </div>
   );
 }
-function Th({ children, cls = '' }: { children: React.ReactNode; cls?: string }) {
-  return <th className={`px-2 py-1.5 font-semibold border border-gray-200 text-center ${cls}`}>{children}</th>;
+function Th({ children, cls = '', title }: { children: React.ReactNode; cls?: string; title?: string }) {
+  return <th title={title} className={`px-2 py-1.5 font-semibold border border-gray-200 text-center ${cls}`}>{children}</th>;
 }
 function Td({ children, num, center, mono, cls = '' }:
   { children: React.ReactNode; num?: boolean; center?: boolean; mono?: boolean; cls?: string }) {

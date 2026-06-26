@@ -213,7 +213,10 @@ export function ProductDashboardView({ code }: { code: string }) {
           )}
 
           <div>
-            <label className="block text-[11px] text-gray-500 mb-1">指定総数（任意・SKU内訳の按分）</label>
+            <label className="block text-[11px] text-gray-500 mb-1"
+              title="未指定＝推奨発注数（不足ベース）。総数を入れると「不足ベース」「構成比」の2案を併記します">
+              指定総数（任意・SKU内訳の按分）
+            </label>
             <input type="number" min={0} value={totalQty} placeholder="未指定"
               onChange={(e) => setTotalQty(e.target.value)}
               className="px-2.5 py-1.5 border border-gray-300 rounded text-sm w-32" />
