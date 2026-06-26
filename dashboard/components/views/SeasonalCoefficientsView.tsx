@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { CircularProgress } from '@/components/CircularProgress';
 
-interface Cat { gender: string; child_item_type: string; weeks: (number | null)[]; total: number; }
+interface Cat { gender: string; child_item_type: string; weeks: (number | null)[]; total: number; from_parent?: boolean; }
 
 // 1.00=平均週(白) / >1=繁忙期(赤) / <1=閑散期(青)
 function cellColor(c: number | null): string {
@@ -41,6 +41,7 @@ export function SeasonalCoefficientsView() {
         <p className="text-[11px] text-gray-500 mt-1">
           シミュレーションの季節調整に使う基礎値です。<b>過去2年の受注実績</b>から算出（{updated ? updated.slice(0, 10) : '—'} 更新）。
           <b>1.00＝平均週</b>／<span className="text-rose-600">&gt;1＝繁忙期(赤)</span>／<span className="text-blue-600">&lt;1＝閑散期(青)</span>。<b>全カテゴリ・全52週に実数</b>が入ります（0.00＝その週は販売ゼロ）。
+          <br />この表は<b>実績そのままの生係数</b>を表示しています。シミュレーション計算では暴れ防止のため、別途<b>補正後の値（3週平滑化＋0.20〜3.00に調整）</b>を使用します。少量カテゴリは<span className="text-amber-600">親カテゴリの季節傾向（<b>親</b>マーク）</span>で補完しています。
         </p>
       </div>
       <div className="flex items-center gap-2 text-[12px]">
@@ -79,12 +80,15 @@ export function SeasonalCoefficientsView() {
                 <td className="px-2 py-1 border border-gray-100 sticky left-0 bg-white z-10 whitespace-nowrap">
                   <span className={`inline-block w-12 font-semibold ${c.gender === 'MEN' ? 'text-blue-700' : 'text-pink-700'}`}>{c.gender}</span>
                   {c.child_item_type}
+                  {c.from_parent && (
+                    <span className="ml-1 px-1 rounded bg-amber-100 text-amber-700 text-[9px] align-middle"
+                      title="このカテゴリは実績が少ないため、親カテゴリの季節傾向で補完しています">親</span>
+                  )}
                 </td>
                 {weeks.map((w) => {
                   const v = c.weeks[w];
                   if (v == null) return (
-                    <td key={w} className="px-1 py-1 border border-gray-100 text-center tabular-nums text-gray-300"
-                      title="この週はトップ50圏外（平均週=1.00として扱います）">1.00</td>
+                    <td key={w} className="px-1 py-1 border border-gray-100 text-center tabular-nums text-gray-300">—</td>
                   );
                   return (
                     <td key={w} className="px-1 py-1 border border-gray-100 text-center tabular-nums"
