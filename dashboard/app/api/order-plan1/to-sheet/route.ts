@@ -113,6 +113,8 @@ export async function POST(req: NextRequest) {
   const pc = (searchParams.get('product_code') || '').trim();
   const start = searchParams.get('start') || '';
   const end = searchParams.get('end') || '';
+  // 集計不要SKU（Plan1で✔）。スプシからも除外し、品番合計を再計算する。
+  const exclude = new Set((searchParams.get('exclude') || '').split(',').map((s) => s.trim().toUpperCase()).filter(Boolean));
   if (!pc) return NextResponse.json({ error: '品番を指定してください。' }, { status: 400 });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
     return NextResponse.json({ error: '日付は YYYY-MM-DD 形式で指定してください。' }, { status: 400 });
@@ -121,6 +123,22 @@ export async function POST(req: NextRequest) {
 
   try {
     const plan = await fetchPlan1(pc, start, end);
+    // 集計不要SKUを除外し、品番合計（粗利率/値引率/上代/枚数）を有効SKUで再計算（画面と一致）。
+    if (exclude.size > 0) {
+      const active = plan.skus.filter((s) => !exclude.has((s.sku_code ?? '').toUpperCase()));
+      const rev = active.reduce((a, s) => a + (s.period_rev || 0), 0);
+      const cost = active.reduce((a, s) => a + (s.period_cost || 0), 0);
+      const lst = active.reduce((a, s) => a + (s.period_lst || 0), 0);
+      const qty = active.reduce((a, s) => a + (s.sales_qty || 0), 0);
+      plan.skus = active;
+      plan.header = {
+        ...plan.header,
+        total_margin_pct: rev > 0 ? Math.round((rev - cost) / rev * 1000) / 10 : null,
+        total_discount_pct: lst > 0 ? Math.round((1 - rev / lst) * 1000) / 10 : null,
+        total_list_amount: lst,
+        total_qty: qty,
+      };
+    }
     const matrix = plan1ToMatrix(plan);
     // 顧客#8/#9/#10: 出力ごとに独立スプシを `品番-日付-連番` で新規作成（上書き・色残り解消）
     // =IMAGE / %表示のため USER_ENTERED、書式（色帯・ハイライト）も適用

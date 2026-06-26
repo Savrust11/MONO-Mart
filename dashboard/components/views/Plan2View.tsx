@@ -36,12 +36,12 @@ export function Plan2View({ code, start, end, excluded }:
   const toSheet = useCallback(async () => {
     setOutMsg('スプシ出力中…'); setOutUrl(null);
     try {
-      const res = await fetch(`/api/order-plan2/to-sheet?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}`, { method: 'POST' });
+      const res = await fetch(`/api/order-plan2/to-sheet?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}${exParam ? `&exclude=${encodeURIComponent(exParam)}` : ''}`, { method: 'POST' });
       const j = await res.json();
       if (res.ok) { setOutMsg(`✓ 新規スプレッドシート「${j.filename}」を作成しました（${j.rows}行）`); setOutUrl(j.url || null); }
       else setOutMsg(`エラー: ${j.error || '失敗'}`);
     } catch (e) { setOutMsg('通信エラー: ' + String(e)); }
-  }, [code, start, end]);
+  }, [code, start, end, exParam]);
 
   const run = useCallback(async () => {
     setBusy(true); setLoading(true); setError(null);
