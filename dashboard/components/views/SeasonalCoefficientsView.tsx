@@ -39,8 +39,8 @@ export function SeasonalCoefficientsView() {
       <div>
         <h2 className="text-base font-semibold text-gray-800">52週 季節係数（男女別 × 商品タイプ子別）</h2>
         <p className="text-[11px] text-gray-500 mt-1">
-          シミュレーションの季節調整に使う基礎値です。<b>ファーストセラー（ZOZO BackOffice・直近52週）の販売数</b>から算出（{updated ? updated.slice(0, 10) : '—'} 更新）。
-          各週のトップ50（メンズ50・レディース50）に入った商品タイプ子だけ色が付き、圏外の週は<span className="text-gray-400">1.00（平均週扱い）</span>で表示します。
+          シミュレーションの季節調整に使う基礎値です。<b>過去2年の受注実績</b>から算出（{updated ? updated.slice(0, 10) : '—'} 更新）。
+          <b>1.00＝平均週</b>／<span className="text-rose-600">&gt;1＝繁忙期(赤)</span>／<span className="text-blue-600">&lt;1＝閑散期(青)</span>。<b>全カテゴリ・全52週に実数</b>が入ります（0.00＝その週は販売ゼロ）。
         </p>
       </div>
       <div className="flex items-center gap-2 text-[12px]">
@@ -59,7 +59,8 @@ export function SeasonalCoefficientsView() {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
         <span className="inline-flex items-center gap-1"><span className="inline-block w-3.5 h-3.5 rounded-sm" style={{ background: 'rgba(220,38,38,0.55)' }} />繁忙（&gt;1）</span>
         <span className="inline-flex items-center gap-1"><span className="inline-block w-3.5 h-3.5 rounded-sm" style={{ background: 'rgba(37,99,235,0.45)' }} />閑散（&lt;1）</span>
-        <span className="inline-flex items-center gap-1"><span className="inline-block w-3.5 h-3.5 rounded-sm border border-gray-200 bg-white" /><span className="text-gray-300 font-medium">1.00</span>＝平均週（その週はトップ50圏外＝季節調整なし）</span>
+        <span className="inline-flex items-center gap-1"><span className="inline-block w-3.5 h-3.5 rounded-sm border border-gray-200 bg-white" />1.00＝平均週</span>
+        <span className="inline-flex items-center gap-1"><span className="inline-block w-3.5 h-3.5 rounded-sm" style={{ background: 'rgba(37,99,235,0.65)' }} />0.00＝その週は販売ゼロ</span>
       </div>
       <div className="bg-white border border-gray-200 rounded overflow-x-auto">
         <table className="text-[10px] border-collapse">
