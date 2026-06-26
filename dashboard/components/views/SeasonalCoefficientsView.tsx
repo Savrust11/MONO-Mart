@@ -40,7 +40,7 @@ export function SeasonalCoefficientsView() {
         <h2 className="text-base font-semibold text-gray-800">52週 季節係数（男女別 × 商品タイプ子別）</h2>
         <p className="text-[11px] text-gray-500 mt-1">
           シミュレーションの季節調整に使う基礎値です。<b>1.00＝平均週</b>／<span className="text-rose-600">&gt;1＝繁忙期(赤)</span>／<span className="text-blue-600">&lt;1＝閑散期(青)</span>。
-          ファーストセラーは現状1週分のみのため、<b>過去2年の受注実績</b>から算出（{updated ? updated.slice(0, 10) : '—'} 更新）。
+<b>ファーストセラー（ZOZO BackOffice・直近52週）の販売数</b>から算出（{updated ? updated.slice(0, 10) : '—'} 更新）。
         </p>
       </div>
       <div className="flex items-center gap-2 text-[12px]">
