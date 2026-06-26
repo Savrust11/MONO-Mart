@@ -244,14 +244,15 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
               <div className="flex flex-wrap gap-3">
                 {excludedImages.map((im) => (
                   <figure key={im.color} className="text-center">
+                    {/* 顧客要望: 色は見えるように（グレースケール/塗りつぶしをやめ）、除外印は「斜線1本」だけ */}
                     <div className="relative h-24 w-24">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={im.url} alt={im.color}
-                        className="h-24 w-24 object-cover rounded border border-gray-200 grayscale opacity-40" />
+                        className="h-24 w-24 object-cover rounded border border-gray-300" />
                       <div className="absolute inset-0 rounded pointer-events-none"
-                        style={{ backgroundImage: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.25) 0 5px, transparent 5px 10px)' }} />
+                        style={{ background: 'linear-gradient(to top right, transparent calc(50% - 1.5px), rgba(220,38,38,0.85) calc(50% - 1.5px), rgba(220,38,38,0.85) calc(50% + 1.5px), transparent calc(50% + 1.5px))' }} />
                     </div>
-                    <figcaption className="text-[10px] text-gray-400 mt-1 w-24 truncate line-through">{im.color}</figcaption>
+                    <figcaption className="text-[10px] text-gray-500 mt-1 w-24 truncate">{im.color}</figcaption>
                   </figure>
                 ))}
               </div>
