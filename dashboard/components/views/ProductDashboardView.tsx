@@ -58,8 +58,9 @@ export function ProductDashboardView({ code }: { code: string }) {
     setPlanEnd(isoAddDays(ps, forDays));
   }, []);
   const [totalQty, setTotalQty] = useState(''); // 総数指定（任意・SKU内訳の按分用）
+  const [cutoffN, setCutoffN] = useState('180'); // 基準日数N: 入荷予定が今日+N日より先はフリー在庫から除外
   // 照会で確定した条件（案1/案2ビューへ渡す。入力中の都度fetchを避ける）
-  const [applied, setApplied] = useState({ start: isoDaysAgo(30), end: isoDaysAgo(0), total: 0 });
+  const [applied, setApplied] = useState({ start: isoDaysAgo(30), end: isoDaysAgo(0), total: 0, n: 180 });
 
   // 実績期間モードから実効 [start,end] を決定
   const resolvePeriod = useCallback((): { start: string; end: string } => {
@@ -71,10 +72,11 @@ export function ProductDashboardView({ code }: { code: string }) {
   const run = useCallback(async () => {
     const eff = resolvePeriod();
     const total = Math.max(0, parseInt(totalQty, 10) || 0);
-    setApplied({ ...eff, total });
+    const n = Math.max(0, parseInt(cutoffN, 10) || 180);
+    setApplied({ ...eff, total, n });
     setBusy(true); setLoading(true); setError(null);
     try {
-      const url = `/api/period-report?product_code=${encodeURIComponent(code)}&start=${eff.start}&end=${eff.end}`;
+      const url = `/api/period-report?product_code=${encodeURIComponent(code)}&start=${eff.start}&end=${eff.end}&n=${n}`;
       const res = await fetch(url);
       const json = await res.json();
       if (!res.ok) { setError(json.error || '取得に失敗しました'); setRows(null); }
@@ -82,7 +84,7 @@ export function ProductDashboardView({ code }: { code: string }) {
     } catch (e) {
       setError('通信エラー: ' + String(e)); setRows(null);
     } finally { setLoading(false); }
-  }, [code, resolvePeriod, totalQty]);
+  }, [code, resolvePeriod, totalQty, cutoffN]);
 
   const [sheetMsg, setSheetMsg] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
@@ -222,6 +224,16 @@ export function ProductDashboardView({ code }: { code: string }) {
               className="px-2.5 py-1.5 border border-gray-300 rounded text-sm w-32" />
           </div>
 
+          <div>
+            <label className="block text-[11px] text-gray-500 mb-1"
+              title="入荷予定日が「今日＋N日」より先の入荷分は、フリー在庫に含めません（過大計上→過小発注を防止）。既定180日。">
+              基準日数 N（入荷除外）
+            </label>
+            <input type="number" min={0} value={cutoffN} placeholder="180"
+              onChange={(e) => setCutoffN(e.target.value)}
+              className="px-2.5 py-1.5 border border-gray-300 rounded text-sm w-24" />
+          </div>
+
           <button onClick={run} disabled={loading}
             className="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm">
             {loading ? '照会中…' : '集計'}
@@ -255,7 +267,7 @@ export function ProductDashboardView({ code }: { code: string }) {
       </div>
 
       {/* key で照会のたびに再マウント→即進捗表示・古いデータの残像を防ぐ */}
-      {tab === 'plan1' && <Plan1View key={`${code}|${applied.start}|${applied.end}|${applied.total}`} code={code} start={applied.start} end={applied.end} totalQty={applied.total} />}
+      {tab === 'plan1' && <Plan1View key={`${code}|${applied.start}|${applied.end}|${applied.total}|${applied.n}`} code={code} start={applied.start} end={applied.end} totalQty={applied.total} cutoffN={applied.n} />}
       {tab === 'plan2' && <Plan2View key={`${code}|${applied.start}|${applied.end}`} code={code} start={applied.start} end={applied.end} />}
 
       {tab === 'detail' && busy && <CircularProgress active={loading} label="項目詳細を集計中" onDone={() => setBusy(false)} />}

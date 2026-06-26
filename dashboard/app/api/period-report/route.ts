@@ -11,6 +11,9 @@ export async function GET(req: NextRequest) {
   const pc = (searchParams.get('product_code') || '').trim();
   const start = searchParams.get('start') || '';
   const end = searchParams.get('end') || '';
+  // 基準日数N（入荷予定が今日+N日より先はフリー在庫から除外）。未指定/不正は既定値。
+  const nRaw = parseInt(searchParams.get('n') || '', 10);
+  const cutoffDays = Number.isFinite(nRaw) && nRaw >= 0 ? nRaw : undefined;
 
   if (!pc) {
     return NextResponse.json({ error: '品番（product_code）を指定してください。' }, { status: 400 });
@@ -25,7 +28,7 @@ export async function GET(req: NextRequest) {
   const format = searchParams.get('format');
 
   try {
-    const rows = await fetchPeriodReport(pc, start, end);
+    const rows = await fetchPeriodReport(pc, start, end, cutoffDays);
 
     // ③ CSVエクスポート（Excelで文字化けしないよう UTF-8 BOM）
     if (format === 'csv') {

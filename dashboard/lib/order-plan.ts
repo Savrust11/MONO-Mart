@@ -109,7 +109,8 @@ export interface Plan1 {
   skus: Plan1Sku[];
 }
 
-export async function fetchPlan1(pc: string, start: string, end: string): Promise<Plan1> {
+export async function fetchPlan1(pc: string, start: string, end: string,
+  cutoffDays: number = FUTURE_ARRIVAL_CUTOFF_DAYS): Promise<Plan1> {
   const today = new Date().toISOString().slice(0, 10);
   const asofRow = (await q(
     `SELECT LEAST(@t, CAST(MAX(sale_date) AS STRING)) d FROM ${T('sales_daily')} WHERE source_file='orders'`,
@@ -199,7 +200,7 @@ export async function fetchPlan1(pc: string, start: string, end: string): Promis
        WHERE product_code=@pc AND source_date=(SELECT d FROM latest)
          AND (earliest_arrival_date IS NULL
               OR SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE)
-                 <= DATE_ADD(DATE(@asof), INTERVAL ${FUTURE_ARRIVAL_CUTOFF_DAYS} DAY))
+                 <= DATE_ADD(DATE(@asof), INTERVAL ${cutoffDays} DAY))
        GROUP BY sk`, { pc, asof }),
     // 入荷山1/2/3（品番単位・将来着）
     q(`SELECT SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE) d, SUM(incoming_qty) q

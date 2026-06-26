@@ -52,7 +52,8 @@ const r2 = (x: number) => Math.round(x * 100) / 100;
 // 顧客No.5 (2026-06-24 山口): 着荷が asof から N日より先の入荷予定はフリー在庫に含めない（過小発注防止）
 const FUTURE_ARRIVAL_CUTOFF_DAYS = 180;
 
-export async function fetchPeriodReport(pc: string, start: string, end: string): Promise<ReportRow[]> {
+export async function fetchPeriodReport(pc: string, start: string, end: string,
+  cutoffDays: number = FUTURE_ARRIVAL_CUTOFF_DAYS): Promise<ReportRow[]> {
   // 作成日（自動）= データ最新日を超えない当日
   const today = dstr(new Date());
   const asofRow = (await q(
@@ -157,7 +158,7 @@ export async function fetchPeriodReport(pc: string, start: string, end: string):
        AND source_date=(SELECT MAX(source_date) FROM ${T('incoming_stock')} WHERE product_code=@pc)
        AND (earliest_arrival_date IS NULL
             OR SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE)
-               <= DATE_ADD(DATE(@asof), INTERVAL ${FUTURE_ARRIVAL_CUTOFF_DAYS} DAY))`, { pc, asof },
+               <= DATE_ADD(DATE(@asof), INTERVAL ${cutoffDays} DAY))`, { pc, asof },
   ))[0];
   const incomingRemain = num(inc?.q);
   const arrivals = await q(

@@ -85,8 +85,8 @@ const n = (v: number | null | undefined, suffix = '') =>
   v == null ? '—' : v.toLocaleString('ja-JP') + suffix;
 const d = (v: string | null) => (v ? String(v).slice(0, 10) : '—');
 
-export function Plan1View({ code, start, end, totalQty = 0 }:
-  { code: string; start: string; end: string; totalQty?: number }) {
+export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180 }:
+  { code: string; start: string; end: string; totalQty?: number; cutoffN?: number }) {
   const [data, setData] = useState<Plan1 | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(true); // 進捗（完了アニメ含む）。初期true＝即表示
@@ -112,7 +112,7 @@ export function Plan1View({ code, start, end, totalQty = 0 }:
     setBusy(true); setLoading(true); setError(null);
     try {
       const res = await fetch(
-        `/api/order-plan1?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}`);
+        `/api/order-plan1?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}&n=${cutoffN}`);
       const j = await res.json();
       if (!res.ok) { setError(j.error || '取得に失敗しました'); setData(null); }
       else { setData(j as Plan1); setExcluded(new Set()); }
