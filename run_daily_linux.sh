@@ -29,6 +29,11 @@ ONLY="orders,shipped,reservations,stock_analysis,inventory_sku,inventory_arrival
   timeout 2400 python pipeline/scrapers/zozo_scraper.py
 echo "[1] scrape exit=$?"
 
+# 1b) ZOZOAD（広告実績）は専用フェッチャ。成功マーカーで二重取得防止・失敗時のみ再取得。
+echo "----- [1b] zozoad fetch -----"
+TARGET_DATE="$TARGET" timeout 900 python pipeline/scrapers/fetch_zozoad_report.py || true
+echo "[1b] zozoad exit=$?"
+
 # 2) ETL ingest (GCS -> BigQuery analytics layer; idempotent DELETE+INSERT by date)
 echo "----- [2] ingest -----"
 timeout 1200 python pipeline/main.py --csv-ingest --date "$TARGET"

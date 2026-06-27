@@ -26,6 +26,7 @@ SOURCES = [
     ("PF手数料表",                 "pf_fee_master",        "snapshot_date",    None,                        7),
     ("sitateru",                  "sitateru_item_master", "snapshot_date",    None,                        7),
     ("アクセスログ",               "access_log_daily",     "record_date",      None,                        3),
+    ("ZOZOAD (広告)",             "zozoad_daily",         "record_date",      None,                        3),
 ]
 
 
@@ -62,6 +63,20 @@ def run():
         bstr = f"{behind}日" if behind is not None else "—"
         print(f"{name:<26} {str(latest):<12} {bstr:>6}  {n:>10,}  {mark}")
     print("\n（遅れ＝基準日−最新日。想定ラグを超えると⚠️、大幅超過で🛑＝取得停止の疑い）")
+
+    # --needs-acquire: 想定ラグを超えて遅れているソースがあれば「取得が必要」=exit 1。
+    #   取得リトライ・スケジュールの成功/リトライ判定に使う（全ソース想定内ならexit 0=本日完了）。
+    if "--needs-acquire" in sys.argv:
+        # 日次取得対象のソースだけで判定（sitateru/アクセスログ/MMS等は別経路＝対象外）。
+        DAILY = {"受注 (orders)", "出荷 (shipped)", "在庫スナップショット", "在庫分析 (お気に等)",
+                 "入荷残", "予約管理", "商品別実績/UU (performance)", "ZOZOAD (広告)"}
+        behind = [(n, l, b, lag) for (n, l, b, _, lag) in rows
+                  if n in DAILY and b is not None and b > lag]
+        if behind:
+            print("取得が必要なソース:", ", ".join(f"{n}({l}/{b}日遅れ)" for n, l, b, _l in behind))
+        else:
+            print("全ソース想定ラグ内 → 取得不要")
+        return 1 if behind else 0
 
     # 🛑（停止の疑い）だけを抽出。--alert 時はwebhookにも通知。
     stopped = [(n, l, b) for (n, l, b, _, lag) in rows
