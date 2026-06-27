@@ -139,7 +139,7 @@ export async function fetchPlan1(pc: string, start: string, end: string,
   // ── 並行取得 ──
   const [
     skuMaster, periodSales, colorSales, stockRows, dailySku, dailyStk,
-    arrRows, lastOrd, costRows, resvRows, incRemain, arrivals, header, imgRows, pfRows,
+    arrRows, lastOrd, costRows, sitRows, resvRows, incRemain, arrivals, header, imgRows, pfRows,
     seasonalRows, elapsedRows, firstSaleRows, colorOrderRows,
   ] = await Promise.all([
     // SKUマスタ（product_master 起点で全登録SKU）
@@ -189,6 +189,9 @@ export async function fetchPlan1(pc: string, start: string, end: string,
                     ROW_NUMBER() OVER (PARTITION BY UPPER(TRIM(sku_code)) ORDER BY source_date DESC) rn
                   FROM ${T('cost_master')} WHERE product_code=@pc)
        SELECT sk, vp FROM r WHERE rn=1`, { pc }),
+    // sitateru 確定卸値（品番単位）— 前回原価のフォールバック用（MMS発注単価が0/無い時）。最も網羅的(約8割)。
+    q(`SELECT ANY_VALUE(confirmed_wholesale_price) cw FROM ${T('sitateru_item_master')}
+       WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc)) AND confirmed_wholesale_price>0`, { pc }),
     // 予約未処理数（最新 reservation_date・SKUで合計）SKU別
     q(`WITH latest AS (SELECT MAX(reservation_date) d FROM ${T('reservations')} WHERE product_code=@pc)
        SELECT UPPER(TRIM(sku_code)) sk, SUM(quantity) q FROM ${T('reservations')}
@@ -257,6 +260,8 @@ export async function fetchPlan1(pc: string, start: string, end: string,
        FROM colr JOIN catord ON catord.color_category=colr.cat`, {}),
   ]);
   const pfCost = pfRows[0]?.val == null ? null : num(pfRows[0].val);
+  // 前回原価フォールバック用: sitateru確定卸値（品番単位）。
+  const sitWholesale = sitRows[0]?.cw == null ? null : num(sitRows[0].cw);
   // カラー名→ZOZOBO並び順位（未登録色は末尾）
   const colorRank: Record<string, number> = {};
   for (const r of colorOrderRows) colorRank[String(r.cn)] = Number(r.rank);
@@ -408,7 +413,9 @@ export async function fetchPlan1(pc: string, start: string, end: string,
       sale_type: sm.sale_type ?? null,
       favorites: st.fav, sales_qty: salesQty,
       period_rev: periodRev, period_cost: periodCost, period_lst: periodLst, fku_share: fku,
-      last_order_date: ordMap[sk]?.od ?? null, last_cost: ordMap[sk]?.up ?? null,
+      last_order_date: ordMap[sk]?.od ?? null,
+      // 前回原価: MMS発注単価(>0)優先 → sitateru確定卸値 → MMS評価額(最新加重平均) でフォールバック（顧客2026）。
+      last_cost: (ordMap[sk]?.up && ordMap[sk]!.up! > 0) ? ordMap[sk]!.up : (sitWholesale ?? costMap[sk] ?? null),
       latest_avg_cost: costMap[sk] ?? null, last_arrival_date: arrMap[sk] ?? null,
       current_stock: cur, recommended_qty: recommended, recommended_provisional: true,
       corrected_velo: r2(correctedVelo), velo_basis: veloBasis, confirmed_qty: null,
