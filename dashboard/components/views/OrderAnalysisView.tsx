@@ -11,10 +11,7 @@ import { GlobalSimulationBar, DEFAULT_SIM_PARAMS, recomputeRow, SimParams }
 import { formatNumber, todayJST } from '@/lib/utils';
 import { Download, FileSpreadsheet, RefreshCw, AlertTriangle } from 'lucide-react';
 
-// Phase 2: GCS-hosted Excel (regenerated daily by run_daily.ps1 [3d])
-const EXCEL_LATEST_URL =
-  'https://storage.googleapis.com/mono-back-office-system-exports'
-  + '/order_management/latest/%E7%99%BA%E6%B3%A8%E7%AE%A1%E7%90%86%E8%A1%A8.xlsx';
+// Phase 2: GCS-hosted Excel（毎朝07:00 JST再生成）。非公開バケットのため /api/order-xlsx 経由で配信。
 
 export function OrderAnalysisView() {
   const [date, setDate]           = useState<string>('');  // 空=最新日(マートMAX)を採用（顧客#15）
@@ -135,10 +132,9 @@ export function OrderAnalysisView() {
             <Download className="w-3 h-3" /> CSV
           </a>
           <a
-            href={EXCEL_LATEST_URL}
-            target="_blank" rel="noopener noreferrer"
+            href="/api/order-xlsx"
             className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700"
-            title="毎朝07:00 JSTに最新データで再生成された発注管理表.xlsx (経営者サマリ+23列詳細+緊急度別の3シート)"
+            title="毎朝07:00 JSTに最新データで再生成された発注管理表.xlsx (経営者サマリ+23列詳細+緊急度別の3シート)。SA認証で非公開GCSから配信"
           >
             <FileSpreadsheet className="w-3 h-3" /> Excel
           </a>
