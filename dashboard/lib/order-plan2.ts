@@ -1,4 +1,5 @@
 import { BigQuery } from '@google-cloud/bigquery';
+import { sizeRank } from '@/lib/order-plan';
 
 /**
  * 発注管理表「案2」= 品番 × 指定期間 の 時系列ピボット。
@@ -98,7 +99,7 @@ export async function fetchPlan2(pc: string, start: string, end: string,
     { pc }))[0];
   if (canonRow?.p) pc = canonRow.p;
 
-  const [ordRows, uuRows, costRows, incRows, stkRows, cdaysRows, exclRows, pivRows] = await Promise.all([
+  const [ordRows, uuRows, costRows, incRows, stkRows, cdaysRows, exclRows, pivRows, colorOrderRows] = await Promise.all([
     // 日次 受注（販売数/売上/上代/予約販売数）
     q(`SELECT CAST(sale_date AS STRING) d, SUM(sales_quantity) qty, SUM(sales_amount) rev,
          SUM(proper_price*sales_quantity) lst, SUM(IF(sale_type LIKE '%予約%', sales_quantity, 0)) yqty
@@ -144,7 +145,17 @@ export async function fetchPlan2(pc: string, start: string, end: string,
        FROM ${T('sales_daily')} WHERE product_code=@pc AND source_file='orders'
          AND sale_date BETWEEN DATE(@sd) AND DATE(@ed) AND sales_quantity>0
        GROUP BY sk, d`, { pc, sd: fetchStart, ed: end }),
+    // ZOZOBOカラー順（期間集計と統一）: カラー系順＋カラーコード昇順。
+    q(`WITH catord AS (SELECT color_category, MIN(SAFE_CAST(color_id AS INT64)) cat_min
+                       FROM ${T('color_master')} GROUP BY color_category),
+            colr AS (SELECT TRIM(color_name) cn, ANY_VALUE(color_category) cat, MIN(SAFE_CAST(color_id AS INT64)) cid
+                     FROM ${T('color_master')} GROUP BY cn)
+       SELECT colr.cn, ROW_NUMBER() OVER (ORDER BY catord.cat_min, colr.cid) rank
+       FROM colr JOIN catord ON catord.color_category=colr.cat`, {}),
   ]);
+  const colorRank: Record<string, number> = {};
+  for (const r of colorOrderRows) colorRank[String(r.cn)] = Number(r.rank);
+  const crank = (c: string | null | undefined): number => colorRank[(c ?? '').trim()] ?? 999999;
 
   // 日次マップ化
   const mapBy = (rows: any[], f: (r: any) => any) => {
@@ -217,7 +228,12 @@ export async function fetchPlan2(pc: string, start: string, end: string,
       daily: days.map((d) => v.byDay[d] ?? 0),
       monthly: months.map((mm) => (daysByMonth[mm] ?? []).reduce((a, d) => a + (v.byDay[d] ?? 0), 0)),
     }))
-    .sort((a, b) => (a.color_name ?? '').localeCompare(b.color_name ?? '') || (a.size ?? '').localeCompare(b.size ?? ''));
+    // 期間集計と統一: ZOZOBOカラー順（系順＋コード昇順）→ サイズ昇順（小→大）。
+    .sort((a, b) =>
+      crank(a.color_name) - crank(b.color_name)
+      || (a.color_name ?? '').localeCompare(b.color_name ?? '', 'ja')
+      || sizeRank(a.size) - sizeRank(b.size)
+      || (a.size ?? '').localeCompare(b.size ?? '', 'ja'));
 
   return {
     product_code: pc, start: fetchStart, end, years, months, days, metrics, skuPivot,

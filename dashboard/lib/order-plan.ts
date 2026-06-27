@@ -140,7 +140,7 @@ export async function fetchPlan1(pc: string, start: string, end: string,
   const [
     skuMaster, periodSales, colorSales, stockRows, dailySku, dailyStk,
     arrRows, lastOrd, costRows, resvRows, incRemain, arrivals, header, imgRows, pfRows,
-    seasonalRows, elapsedRows, firstSaleRows,
+    seasonalRows, elapsedRows, firstSaleRows, colorOrderRows,
   ] = await Promise.all([
     // SKUマスタ（product_master 起点で全登録SKU）
     q(`SELECT UPPER(TRIM(sku_code)) sk, ANY_VALUE(color_name) color_name, ANY_VALUE(size) size,
@@ -248,8 +248,19 @@ export async function fetchPlan1(pc: string, start: string, end: string,
     q(`SELECT UPPER(TRIM(sku_code)) sk, CAST(MIN(sale_date) AS STRING) d
        FROM ${T('sales_daily')} WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc)) AND source_file='orders'
        GROUP BY sk`, { pc }),
+    // ZOZOBOのカラー並び順: カラー系の順（系の最小color_id順）＋ 同系内はカラーコード(color_id)昇順。
+    q(`WITH catord AS (SELECT color_category, MIN(SAFE_CAST(color_id AS INT64)) cat_min
+                       FROM ${T('color_master')} GROUP BY color_category),
+            colr AS (SELECT TRIM(color_name) cn, ANY_VALUE(color_category) cat, MIN(SAFE_CAST(color_id AS INT64)) cid
+                     FROM ${T('color_master')} GROUP BY cn)
+       SELECT colr.cn, ROW_NUMBER() OVER (ORDER BY catord.cat_min, colr.cid) rank
+       FROM colr JOIN catord ON catord.color_category=colr.cat`, {}),
   ]);
   const pfCost = pfRows[0]?.val == null ? null : num(pfRows[0].val);
+  // カラー名→ZOZOBO並び順位（未登録色は末尾）
+  const colorRank: Record<string, number> = {};
+  for (const r of colorOrderRows) colorRank[String(r.cn)] = Number(r.rank);
+  const crank = (c: string | null | undefined): number => colorRank[(c ?? '').trim()] ?? 999999;
 
   // ── 欠品補正の係数マップ ──
   const seasonalByWeek: Record<number, number> = {};
@@ -286,7 +297,8 @@ export async function fetchPlan1(pc: string, start: string, end: string,
     .map((r) => ({
       color: String(r.cn),
       url: `https://o.imgz.jp/${String(r.ic).slice(-3)}/${r.ic}/${r.ic}b_${r.cid}_d.jpg`,
-    }));
+    }))
+    .sort((a, b) => crank(a.color) - crank(b.color) || a.color.localeCompare(b.color, 'ja'));  // 画像も左からZOZOBO順
 
   // ── マップ化 ──
   const m = <V>(rows: any[], val: (r: any) => V) => {
@@ -409,10 +421,10 @@ export async function fetchPlan1(pc: string, start: string, end: string,
     };
   });
 
-  // カラーをまとめ（販売数の多いカラー順にグルーピング）、各カラー内はサイズ昇順
-  // （小→大）。client 2026: 「カラーはまとめたい、サイズは小さいサイズから昇順」。
+  // カラーは ZOZOBO 順（カラー系順＋カラーコード昇順）でまとめ、各カラー内はサイズ昇順（小→大）。
+  // client 2026: 「カラーの順番はZOZOBOと同じに、サイズは小さいサイズから昇順」。
   skus.sort((a, b) =>
-    (colorTotal[b.color_name ?? ''] ?? 0) - (colorTotal[a.color_name ?? ''] ?? 0)
+    crank(a.color_name) - crank(b.color_name)
     || (a.color_name ?? '').localeCompare(b.color_name ?? '', 'ja')
     || sizeRank(a.size) - sizeRank(b.size)
     || (a.size ?? '').localeCompare(b.size ?? '', 'ja'));
