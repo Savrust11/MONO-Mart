@@ -115,7 +115,8 @@ function buildPlan1Format(sheetId: number, values: (string | number)[][]): unkno
         fields: 'userEnteredFormat.numberFormat',
       },
     });
-    reqs.push(hdrFmt(12, '0.0%', 'PERCENT'), hdrFmt(13, '0.0%', 'PERCENT'), hdrFmt(14, '#,##0"円"'), hdrFmt(15, '#,##0'));
+    // ヘッダに「データ基準日」を1行追加したぶん、合計セルの行は 12-15 → 13-16 にずれる
+    reqs.push(hdrFmt(13, '0.0%', 'PERCENT'), hdrFmt(14, '0.0%', 'PERCENT'), hdrFmt(15, '#,##0"円"'), hdrFmt(16, '#,##0'));
   }
   return reqs;
 }

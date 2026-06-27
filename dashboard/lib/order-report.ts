@@ -54,8 +54,8 @@ const FUTURE_ARRIVAL_CUTOFF_DAYS = 180;
 
 export async function fetchPeriodReport(pc: string, start: string, end: string,
   cutoffDays: number = FUTURE_ARRIVAL_CUTOFF_DAYS): Promise<ReportRow[]> {
-  // 作成日（自動）= データ最新日を超えない当日
-  const today = dstr(new Date());
+  // 作成日 = 本日（JST・生成した実日付）。データ基準日(asof) = 実績が揃う最新日（取得ラグで前日になりうる）。
+  const today = dstr(new Date(Date.now() + 9 * 3600 * 1000));  // JST当日（UTCずれ防止）
   const asofRow = (await q(
     `SELECT LEAST(@t, CAST(MAX(sale_date) AS STRING)) d FROM ${T('sales_daily')} WHERE source_file='orders'`,
     { t: today },
@@ -337,7 +337,9 @@ export async function fetchPeriodReport(pc: string, start: string, end: string,
   rows.push({ kind: 'title', label: '発注管理表（項目詳細） — 品番×期間の実数', value: '', note: '' });
   sec('基本情報');
   it('品番', pc); it('商品名', m.nm ?? null); it('ショップ', m.shop ?? null);
-  it('集計開始日', start, '入力値'); it('集計終了日', end, '入力値'); it('作成日', asof, '自動（データ最新日）');
+  it('集計開始日', start, '入力値'); it('集計終了日', end, '入力値');
+  it('作成日', today, '本日（このデータを表示した日）');
+  it('データ基準日', asof, '実績が揃っている最新日（受注データの取得が1〜2日遅れるため当日の前になることがあります）');
   blank(); sec('① 集計');
   it('ブランド（親カテゴリ）', brand, '年2回【限定】回避＝直近の非限定値を引継ぎ（R09）');
   it('商品タイプ親', m.pit ?? null); it('商品タイプ子', m.cit ?? null);

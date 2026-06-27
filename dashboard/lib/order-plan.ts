@@ -99,7 +99,7 @@ export interface Plan1Image { color: string; url: string; }
 export interface Plan1 {
   images: Plan1Image[];   // 商品画像（カラー別）R02
   header: {
-    created_at: string; start: string; end: string;
+    created_at: string; data_asof: string; start: string; end: string;
     product_code: string; product_name: string | null; shop: string | null;
     brand: string | null; item_type_parent: string | null; item_type_child: string | null;
     review_count: number | null; review_avg: number | null;
@@ -111,7 +111,7 @@ export interface Plan1 {
 
 export async function fetchPlan1(pc: string, start: string, end: string,
   cutoffDays: number = FUTURE_ARRIVAL_CUTOFF_DAYS): Promise<Plan1> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);  // JST当日
   const asofRow = (await q(
     `SELECT LEAST(@t, CAST(MAX(sale_date) AS STRING)) d FROM ${T('sales_daily')} WHERE source_file='orders'`,
     { t: today },
@@ -404,7 +404,7 @@ export async function fetchPlan1(pc: string, start: string, end: string,
 
   return {
     images,
-    header: { created_at: asof, start, end, product_code: pc, ...header },
+    header: { created_at: today, data_asof: asof, start, end, product_code: pc, ...header },
     skus,
   };
 }
@@ -435,6 +435,7 @@ export function plan1ToMatrix(p: Plan1, excludedColors?: Set<string>): (string |
   const head: (string | number)[][] = [
     ['発注管理表 期間集計'],
     ['作成日', v(h.created_at)],
+    ['データ基準日', v(h.data_asof)],
     ['集計開始日', v(h.start)],
     ['集計終了日', v(h.end)],
     ['品番', v(h.product_code)],

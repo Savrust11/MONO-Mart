@@ -71,7 +71,7 @@ interface Plan1Image { color: string; url: string; }
 interface Plan1 {
   images: Plan1Image[];
   header: {
-    created_at: string; start: string; end: string; product_code: string;
+    created_at: string; data_asof: string; start: string; end: string; product_code: string;
     product_name: string | null; shop: string | null; brand: string | null;
     item_type_parent: string | null; item_type_child: string | null;
     review_count: number | null; review_avg: number | null;
@@ -211,6 +211,7 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
         <Field label="ショップ" value={h.shop ?? '—'} />
         <Field label="ブランド" value={h.brand ?? '—'} />
         <Field label="作成日" value={d(h.created_at)} />
+        <Field label="データ基準日" value={d(h.data_asof)} />
         <Field label="商品名" value={h.product_name ?? '—'} span />
         <Field label="商品タイプ" value={`${h.item_type_parent ?? '—'} / ${h.item_type_child ?? '—'}`} />
         <Field label="集計期間" value={`${d(h.start)} 〜 ${d(h.end)}`} />
