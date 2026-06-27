@@ -77,8 +77,18 @@ with sync_playwright() as p:
                     if t and len(t) < 20: texts.append(t)
                 except Exception: pass
             print("[6] 日付の選択肢候補:", texts)
+            # 「最後 7 日間」を選択して反映を確認
+            dash.get_by_text("最後 7 日間").first.click(timeout=5000)
+            time.sleep(2)
+            for sel in ("button:has-text('更新')", "button:has-text('適用')"):
+                loc = dash.locator(sel)
+                if loc.count() > 0 and loc.first.is_visible():
+                    loc.first.click(timeout=3000); break
+            time.sleep(6)
+            page.screenshot(path=str(OUT / "diag_date_after.png"), full_page=True)
+            print("[7] 最後7日間を選択→スクショ(diag_date_after.png)")
         except Exception as e:
-            print("[6] 日付フィルタ展開失敗:", str(e)[:80])
+            print("[6/7] 日付フィルタ操作失敗:", str(e)[:80])
     # iframe本文からも日付抽出を試す
     if dash:
         try:

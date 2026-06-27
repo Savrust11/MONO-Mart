@@ -205,21 +205,22 @@ def set_looker_date_last7(dash) -> bool:
     既定が「前週」だと先週(〜先週末)までしか取れず最新日が欠ける（顧客2026）。
     最後7日間にすると2日ラグ込みの最新まで取得できる。"""
     try:
-        # 1) 日付チップ（前週/今日/◯日間 等の日付トークン）を開く
-        opened = dash.evaluate(r"""() => {
-          const tokens = [...document.querySelectorAll('[data-testid="filter-token"]')];
-          for (const t of tokens) {
-            const txt = (t.innerText||'').replace(/\s+/g,' ').trim();
-            if (/前週|今週|^週|日間|昨日|今日|前日|前々日/.test(txt)) {
-              t.scrollIntoView({block:'center'}); t.click(); return txt;
-            }
-          }
-          return '';
-        }""")
-        if not opened:
+        time.sleep(3)
+        # 1) 日付チップを開く（既定「前週」。将来変わる可能性に備え複数候補を順に試す）
+        clicked = False
+        for label in ("前週", "最後 7 日間", "最後 14 日間", "今週", "前日", "昨日", "今日", "年初来"):
+            try:
+                loc = dash.get_by_text(label, exact=True)
+                if loc.count() > 0:
+                    loc.first.click(timeout=4_000)
+                    clicked = True
+                    break
+            except Exception:
+                continue
+        if not clicked:
             return False
         time.sleep(2)
-        # 2) 「最後 7 日間」を選択
+        # 2) 「最後 7 日間」を選択（ドロップダウン内）
         dash.get_by_text("最後 7 日間").first.click(timeout=5_000)
         time.sleep(2)
         # 3) 更新/適用（あれば）
