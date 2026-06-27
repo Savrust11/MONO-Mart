@@ -447,27 +447,28 @@ export function plan1ToMatrix(p: Plan1): (string | number)[][] {
     ['合計上代額', v(h.total_list_amount)],
     ['合計枚数', h.total_qty],
   ];
-  // ── ② 商品画像（カラー別）：ヘッダ右側（列H〜）に 5列/行 のグリッドで併置（画像の元レイアウトに一致）──
-  //   顧客要件＝画像を「表示」。インライン表示は =IMAGE が唯一の手段。
-  //   各バンド: 画像行（=IMAGE）＋ カラー名行（下段）。※=IMAGE は初回「アクセスを許可」が必要（Google仕様）。
-  const setCell = (rows: (string | number)[][], r: number, c: number, val: string | number) => {
-    while (rows.length <= r) rows.push([]);
-    const row = rows[r];
-    while (row.length <= c) row.push('');
-    row[c] = val;
-  };
-  const IMG_C0 = 7, PER_ROW = 5, IMG_R0 = 1;
-  if (p.images.length) {
-    setCell(head, 0, IMG_C0, '商品画像（カラー別）');
-    p.images.forEach((im, i) => {
-      const band = Math.floor(i / PER_ROW);
-      const c = IMG_C0 + (i % PER_ROW);
-      const imgRow = IMG_R0 + band * 2;          // 画像セル
-      setCell(head, imgRow, c, `=IMAGE("${im.url}")`);
-      setCell(head, imgRow + 1, c, im.color);    // カラー名（画像の下）
-    });
-  }
   const m: (string | number)[][] = [...head];
+
+  // ── ② 商品画像（カラー別）：ヘッダ（作成日/品番/商品名…）の「下」に独立した行で配置 ──
+  //   顧客要望(2026): 画像を日付・品番・商品名と同じ行に置くと、画像の高さでそれらの行まで
+  //   高くなってしまう。ダッシュボードのように「画像だけの行」にして、ヘッダ行の高さに影響させない。
+  //   インライン表示は =IMAGE が唯一の手段（初回「アクセスを許可」が必要・Google仕様）。
+  if (p.images.length) {
+    const PER_ROW = 5;
+    m.push([]);                                  // ヘッダと画像の区切り（空行）
+    m.push(['商品画像（カラー別）']);              // セクション見出し
+    for (let band = 0; band * PER_ROW < p.images.length; band++) {
+      const imgRow: (string | number)[] = [];
+      const nameRow: (string | number)[] = [];
+      for (let k = 0; k < PER_ROW; k++) {
+        const im = p.images[band * PER_ROW + k];
+        imgRow[k] = im ? `=IMAGE("${im.url}")` : '';
+        nameRow[k] = im ? im.color : '';
+      }
+      m.push(imgRow);                            // 画像だけの行（=IMAGE）
+      m.push(nameRow);                           // カラー名の行（画像の下）
+    }
+  }
 
   // ── ③ 明細テーブル（グループ見出し → 列見出し → データ）──
   m.push([]);

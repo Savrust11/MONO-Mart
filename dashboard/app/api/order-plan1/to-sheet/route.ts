@@ -31,7 +31,9 @@ const bgReq = (sheetId: number, r0: number, r1: number, c0: number, c1: number, 
 function buildPlan1Format(sheetId: number, values: (string | number)[][]): unknown[] {
   const reqs: unknown[] = [];
 
-  // 画像（=IMAGE）セルがある行を高く＋画像列(H〜L)を広く＝サムネイル表示
+  // 画像（=IMAGE）セルがある行だけを高くしてサムネイル表示。
+  //   画像は「画像だけの独立行」(ヘッダ下・A〜E列)に配置済みのため、日付/品番/商品名の行高には影響しない。
+  //   列幅は既定(約100px)のまま＝明細テーブルの列幅を崩さない（=IMAGE は行高に合わせて自動縮尺）。
   const imgRows: number[] = [];
   values.forEach((row, ri) => {
     if (row.some((c) => typeof c === 'string' && c.startsWith('=IMAGE'))) imgRows.push(ri);
@@ -39,11 +41,6 @@ function buildPlan1Format(sheetId: number, values: (string | number)[][]): unkno
   for (const ri of imgRows) {
     reqs.push({ updateDimensionProperties: {
       range: { sheetId, dimension: 'ROWS', startIndex: ri, endIndex: ri + 1 },
-      properties: { pixelSize: 96 }, fields: 'pixelSize' } });
-  }
-  if (imgRows.length) {
-    reqs.push({ updateDimensionProperties: {
-      range: { sheetId, dimension: 'COLUMNS', startIndex: 7, endIndex: 12 },
       properties: { pixelSize: 96 }, fields: 'pixelSize' } });
   }
 
