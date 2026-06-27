@@ -195,8 +195,14 @@ export async function fetchPlan1(pc: string, start: string, end: string,
        WHERE product_code=@pc AND reservation_date=(SELECT d FROM latest) GROUP BY sk`, { pc }),
     // 入荷残（最新 source_date）SKU別 → フリー在庫
     // 顧客No.5: 着荷 > asof+N日 の入荷予定は将来発注扱いで除外（日付なし・期日超過は含める）
+    // incoming_stock.sku_code は「品番＋SKU」連結（例 BLEsh1667F10181pf）。商品マスタは「F10181pf」。
+    // 先頭の品番接頭辞を除去してSKUに揃えてから集計（揃えないと入荷残がフリー在庫に乗らない不具合）。
     q(`WITH latest AS (SELECT MAX(source_date) d FROM ${T('incoming_stock')} WHERE product_code=@pc)
-       SELECT UPPER(TRIM(sku_code)) sk, SUM(incoming_qty) q FROM ${T('incoming_stock')}
+       SELECT UPPER(TRIM(
+                CASE WHEN STARTS_WITH(UPPER(TRIM(sku_code)), UPPER(TRIM(product_code)))
+                     THEN SUBSTR(TRIM(sku_code), LENGTH(TRIM(product_code)) + 1)
+                     ELSE sku_code END)) sk,
+              SUM(incoming_qty) q FROM ${T('incoming_stock')}
        WHERE product_code=@pc AND source_date=(SELECT d FROM latest)
          AND (earliest_arrival_date IS NULL
               OR SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE)
