@@ -195,6 +195,8 @@ export async function fetchPlan2(pc: string, start: string, end: string,
 
   // 集約ヘルパ（バケット内の成分合計から比率系を導出）
   const sum = (ds: string[], pick: (c: Comp) => number) => ds.reduce((a, d) => a + pick(comp[d]), 0);
+  // UU(performance)がある日だけで合計（CVRの歪み防止: UV未取得日の受注を分子に入れない）。
+  const sumIfUU = (ds: string[], pick: (c: Comp) => number) => ds.reduce((a, d) => a + (comp[d].uu > 0 ? pick(comp[d]) : 0), 0);
   const lastStock = (ds: string[]): number | null => {
     for (let i = ds.length - 1; i >= 0; i--) { const s = comp[ds[i]].stk; if (s != null) return s; }
     return null;
@@ -204,7 +206,7 @@ export async function fetchPlan2(pc: string, start: string, end: string,
 
   const metricDefs: { key: string; label: string; format: MetricFormat; calc: (ds: string[]) => number | null }[] = [
     { key: 'uu', label: 'UU', format: 'int', calc: (ds) => sum(ds, (c) => c.uu) || null },
-    { key: 'cvr', label: 'CVR', format: 'pct', calc: (ds) => pct(sum(ds, (c) => c.qty), sum(ds, (c) => c.uu)) },
+    { key: 'cvr', label: 'CVR', format: 'pct', calc: (ds) => pct(sumIfUU(ds, (c) => c.qty), sum(ds, (c) => c.uu)) },
     { key: 'fav_rate', label: 'お気に率', format: 'pct', calc: (ds) => pct(sum(ds, (c) => c.fav), sum(ds, (c) => c.uu)) },
     { key: 'cp_rate', label: 'CP対象枚数比', format: 'pct', calc: (ds) => pct(sum(ds, (c) => c.cp), sum(ds, (c) => c.qty)) },
     { key: 'margin', label: '粗利率', format: 'pct', calc: (ds) => { const r = sum(ds, (c) => c.rev); return r ? r1((r - sum(ds, (c) => c.cost)) / r * 100) : null; } },
@@ -246,8 +248,14 @@ export async function fetchPlan2(pc: string, start: string, end: string,
       || sizeRank(a.size) - sizeRank(b.size)
       || (a.size ?? '').localeCompare(b.size ?? '', 'ja'));
 
+  // UU(商品別実績)の最新取得日。受注より遅れている場合は「ここまで」と明示（取得ラグの透明化）。
+  const uuLatest = allDays.filter((d) => comp[d].uu > 0).sort().pop() ?? null;
+  const ordLatest = allDays.filter((d) => comp[d].qty > 0).sort().pop() ?? null;
+  const uuNote = (uuLatest && ordLatest && uuLatest < ordLatest)
+    ? `／UU・CVR・お気に率は ${uuLatest} まで（以降は商品別実績データの取得待ち）`
+    : '';
   return {
     product_code: pc, start: fetchStart, end, years, months, days, metrics, skuPivot,
-    note: `年/月/日ピボット（${years.length}年 / ${months.length}ヶ月 / 全${days.length}日）`,
+    note: `年/月/日ピボット（${years.length}年 / ${months.length}ヶ月 / 全${days.length}日）${uuNote}`,
   };
 }
