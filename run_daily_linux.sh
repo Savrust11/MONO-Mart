@@ -56,4 +56,9 @@ echo "----- [5] notify -----"
 timeout 120 python pipeline/notify_daily.py "$TARGET"
 echo "[5] notify exit=$?"
 
+# 6) Data freshness dashboard + alert（UU/performance等が遅延/停止したら通知。ZOZO追いつき次第自動回復）
+echo "----- [6] freshness -----"
+timeout 180 python pipeline/data_freshness.py --alert || true
+echo "[6] freshness exit=$?"
+
 echo "===== LINUX DAILY DONE  $(date) ====="

@@ -1,6 +1,10 @@
 """データ鮮度ダッシュボード: 各データ源が「何日まで来ているか」「何日遅れか」を一覧化。
 Xサーバ(ZOZO IPロック)の取得停止箇所を可視化するための監視ツール。毎回再実行可。
 """
+import json
+import os
+import sys
+import urllib.request
 from datetime import date
 from google.cloud import bigquery
 
@@ -59,6 +63,26 @@ def run():
         print(f"{name:<26} {str(latest):<12} {bstr:>6}  {n:>10,}  {mark}")
     print("\n（遅れ＝基準日−最新日。想定ラグを超えると⚠️、大幅超過で🛑＝取得停止の疑い）")
 
+    # 🛑（停止の疑い）だけを抽出。--alert 時はwebhookにも通知。
+    stopped = [(n, l, b) for (n, l, b, _, lag) in rows
+               if b is not None and b > lag + 4]
+    if "--alert" in sys.argv and stopped:
+        msg = "🛑 データ取得の遅延/停止を検知（鮮度ダッシュボード）\n" + "\n".join(
+            f"・{n}: {l} まで（{b}日遅れ）" for n, l, b in stopped)
+        url = os.environ.get("ALERT_WEBHOOK_URL", "").strip()
+        if url:
+            try:
+                payload = {"content": msg} if "discord" in url else {"text": msg}
+                req = urllib.request.Request(url, data=json.dumps(payload).encode(),
+                                             headers={"Content-Type": "application/json"})
+                urllib.request.urlopen(req, timeout=15)
+                print("[freshness] webhookへ遅延アラート送信")
+            except Exception as e:
+                print(f"[freshness] webhook送信失敗: {e}")
+        else:
+            print("[freshness] ALERT_WEBHOOK_URL 未設定（ログのみ）")
+    return 1 if ("--alert" in sys.argv and stopped) else 0
+
 
 if __name__ == "__main__":
-    run()
+    sys.exit(run())
