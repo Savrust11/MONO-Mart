@@ -16,7 +16,7 @@ interface SystemStats {
 }
 
 const SHORTCUTS = [
-  { title: '同一品番併売',     desc: '同一品番のカラー・サイズ別併売状況', href: '/dashboard/analytics?view=cross-buy', icon: Package, color: 'cyan' },
+  { title: '同一品番併売',     desc: '同一品番のカラー・サイズ別併売状況', href: '/dashboard/analytics?view=cross-buy', icon: Package, color: 'cyan', dummy: true },
   { title: '発注推奨データ',    desc: '在庫日数・トレンドから発注推奨',      href: '/dashboard/analytics?view=order-recommend', icon: ShoppingBag, color: 'green' },
   { title: 'リピート発注表作成', desc: '発注管理表をV2ロジックで自動生成',     href: '/dashboard/analytics?view=repeat-order', icon: TrendingUp, color: 'rose' },
   { title: 'MD計画',           desc: 'カテゴリ別MD計画と提案',              href: '/dashboard/analytics?view=md-plan',  icon: BarChart3, color: 'amber' },
@@ -93,7 +93,7 @@ function Stat({
   );
 }
 
-function Shortcut({ title, desc, href, icon: Icon, color }: any) {
+function Shortcut({ title, desc, href, icon: Icon, color, dummy }: any) {
   const colorMap: Record<string, { bg: string; text: string }> = {
     cyan:   { bg: 'bg-cyan-50',   text: 'text-cyan-600' },
     green:  { bg: 'bg-green-50',  text: 'text-green-600' },
@@ -114,7 +114,10 @@ function Shortcut({ title, desc, href, icon: Icon, color }: any) {
         </div>
         <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-cyan-600 group-hover:translate-x-0.5 transition-all" />
       </div>
-      <h3 className="text-sm font-bold text-gray-900">{title}</h3>
+      <h3 className="text-sm font-bold text-gray-900">
+        {title}
+        {dummy && <span className="ml-1.5 px-1 py-px rounded bg-gray-200 text-gray-500 text-[9px] align-middle">準備中</span>}
+      </h3>
       <p className="text-[11px] text-gray-600 mt-0.5">{desc}</p>
     </Link>
   );

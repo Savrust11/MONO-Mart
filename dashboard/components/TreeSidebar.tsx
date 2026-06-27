@@ -8,7 +8,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 interface TreeItem {
   label: string;
   href?: string;
-  children?: { label: string; href: string }[];
+  children?: { label: string; href: string; dummy?: boolean }[];  // dummy:true ＝ 準備中（中身なし）
 }
 
 // 分析タブのツリー（/dashboard/analytics と /dashboard/seasonal で共用）
@@ -16,30 +16,30 @@ const ANALYTICS_TREE: TreeItem[] = [
   {
     label: '併売分析',
     children: [
-      { label: '同一品番併売',  href: '/dashboard/analytics?view=cross-buy' },
-      { label: 'ブランド間併売', href: '/dashboard/analytics?view=brand-cross' },
-      { label: 'カテゴリ間併売', href: '/dashboard/analytics?view=category-cross' },
+      { label: '同一品番併売',  href: '/dashboard/analytics?view=cross-buy', dummy: true },
+      { label: 'ブランド間併売', href: '/dashboard/analytics?view=brand-cross', dummy: true },
+      { label: 'カテゴリ間併売', href: '/dashboard/analytics?view=category-cross', dummy: true },
     ],
   },
   {
     label: '売上分析',
     children: [
-      { label: '日別売上推移',  href: '/dashboard/analytics?view=daily-sales' },
-      { label: 'カテゴリ別売上', href: '/dashboard/analytics?view=cat-sales' },
-      { label: '品番別売上',    href: '/dashboard/analytics?view=sku-sales' },
+      { label: '日別売上推移',  href: '/dashboard/analytics?view=daily-sales', dummy: true },
+      { label: 'カテゴリ別売上', href: '/dashboard/analytics?view=cat-sales', dummy: true },
+      { label: '品番別売上',    href: '/dashboard/analytics?view=sku-sales', dummy: true },
     ],
   },
   {
     label: '在庫分析',
     children: [
-      { label: '在庫消化予測', href: '/dashboard/analytics?view=stock-forecast' },
-      { label: '不動在庫分析', href: '/dashboard/analytics?view=dead-stock' },
+      { label: '在庫消化予測', href: '/dashboard/analytics?view=stock-forecast', dummy: true },
+      { label: '不動在庫分析', href: '/dashboard/analytics?view=dead-stock', dummy: true },
     ],
   },
   {
     label: 'リピート分析',
     children: [
-      { label: 'リピートシミュレーション', href: '/dashboard/analytics?view=repeat-sim' },
+      { label: 'リピートシミュレーション', href: '/dashboard/analytics?view=repeat-sim', dummy: true },
       { label: '発注推奨データ',          href: '/dashboard/analytics?view=order-recommend' },
       { label: 'リピート発注表作成',      href: '/dashboard/analytics?view=repeat-order' },
       { label: '52週 季節係数',           href: '/dashboard/seasonal' },
@@ -170,13 +170,19 @@ export function TreeSidebar() {
                     <li key={child.href}>
                       <Link
                         href={child.href}
-                        className={`block pl-8 pr-3 py-1.5 text-[13px] transition-colors ${
+                        title={child.dummy ? `${child.label}（準備中・未実装）` : child.label}
+                        className={`flex items-center justify-between pl-8 pr-3 py-1.5 text-[13px] transition-colors ${
                           isActive(child.href)
                             ? 'bg-sky-50 text-sky-600 font-bold border-l-[3px] border-sky-500 -ml-[3px] pl-[33px]'
-                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                            : child.dummy
+                              ? 'text-gray-400 hover:bg-gray-50'
+                              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                         }`}
                       >
-                        ・{child.label}
+                        <span>・{child.label}</span>
+                        {child.dummy && (
+                          <span className="ml-1 px-1 py-px rounded bg-gray-200 text-gray-500 text-[9px] leading-none shrink-0">準備中</span>
+                        )}
                       </Link>
                     </li>
                   ))}

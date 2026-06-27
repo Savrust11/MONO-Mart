@@ -7,16 +7,17 @@ import {
   BarChart3, LayoutGrid, Globe, Database, HelpCircle
 } from 'lucide-react';
 
+// dummy:true ＝ 準備中（中身なし）。お客様が実装済みメニューを見分けられるよう淡色＋「準備中」表示。
 const TABS = [
   { href: '/dashboard',           label: '商品管理',       icon: Package    },
-  { href: '/dashboard/logistics', label: '物流管理',       icon: Truck      },
-  { href: '/dashboard/inventory', label: '在庫管理',       icon: Boxes      },
-  { href: '/dashboard/customers', label: '顧客・注文管理', icon: Users      },
-  { href: '/dashboard/finance',   label: '会計・精算',      icon: Calculator },
+  { href: '/dashboard/logistics', label: '物流管理',       icon: Truck,      dummy: true },
+  { href: '/dashboard/inventory', label: '在庫管理',       icon: Boxes,      dummy: true },
+  { href: '/dashboard/customers', label: '顧客・注文管理', icon: Users,      dummy: true },
+  { href: '/dashboard/finance',   label: '会計・精算',      icon: Calculator, dummy: true },
   { href: '/dashboard/analytics', label: '分析',           icon: BarChart3,  highlight: 'cyan'   },
   { href: '/dashboard/product',   label: 'ダッシュボード', icon: LayoutGrid, highlight: 'orange' },
-  { href: '/dashboard/site',      label: 'サイト管理',      icon: Globe      },
-  { href: '/dashboard/master',    label: 'マスター管理',    icon: Database   },
+  { href: '/dashboard/site',      label: 'サイト管理',      icon: Globe,      dummy: true },
+  { href: '/dashboard/master',    label: 'マスター管理',    icon: Database,   dummy: true },
   { href: '/dashboard/help',      label: 'ヘルプ',         icon: HelpCircle },
 ];
 
@@ -43,10 +44,14 @@ export function TabNav() {
           <Link
             key={tab.href}
             href={tab.href}
-            className={`inline-flex items-center gap-1.5 h-full px-3 transition-colors ${bg}`}
+            title={tab.dummy ? `${tab.label}（準備中・未実装）` : tab.label}
+            className={`inline-flex items-center gap-1.5 h-full px-3 transition-colors ${bg} ${tab.dummy && !isActive ? 'opacity-50' : ''}`}
           >
             <Icon className="w-3.5 h-3.5" />
             <span>{tab.label}</span>
+            {tab.dummy && (
+              <span className="ml-0.5 px-1 py-px rounded bg-gray-500/70 text-gray-200 text-[9px] leading-none">準備中</span>
+            )}
           </Link>
         );
       })}
