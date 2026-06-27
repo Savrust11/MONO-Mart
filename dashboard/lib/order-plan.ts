@@ -189,9 +189,10 @@ export async function fetchPlan1(pc: string, start: string, end: string,
                     ROW_NUMBER() OVER (PARTITION BY UPPER(TRIM(sku_code)) ORDER BY source_date DESC) rn
                   FROM ${T('cost_master')} WHERE product_code=@pc)
        SELECT sk, vp FROM r WHERE rn=1`, { pc }),
-    // sitateru 確定卸値（品番単位）— 前回原価のフォールバック用（MMS発注単価が0/無い時）。最も網羅的(約8割)。
-    q(`SELECT ANY_VALUE(confirmed_wholesale_price) cw FROM ${T('sitateru_item_master')}
-       WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc)) AND confirmed_wholesale_price>0`, { pc }),
+    // sitateru（品番単位）— 前回原価フォールバック(確定卸値)＋最終入荷日フォールバック(確定納品日)。最も網羅的。
+    q(`SELECT MAX(IF(confirmed_wholesale_price>0, confirmed_wholesale_price, NULL)) cw,
+              CAST(MAX(SAFE_CAST(REPLACE(confirmed_delivery_date,'/','-') AS DATE)) AS STRING) cd
+       FROM ${T('sitateru_item_master')} WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc))`, { pc }),
     // 予約未処理数（最新 reservation_date・SKUで合計）SKU別
     q(`WITH latest AS (SELECT MAX(reservation_date) d FROM ${T('reservations')} WHERE product_code=@pc)
        SELECT UPPER(TRIM(sku_code)) sk, SUM(quantity) q FROM ${T('reservations')}
@@ -260,8 +261,9 @@ export async function fetchPlan1(pc: string, start: string, end: string,
        FROM colr JOIN catord ON catord.color_category=colr.cat`, {}),
   ]);
   const pfCost = pfRows[0]?.val == null ? null : num(pfRows[0].val);
-  // 前回原価フォールバック用: sitateru確定卸値（品番単位）。
+  // sitateru（品番単位）フォールバック値: 確定卸値（前回原価用）・確定納品日（最終入荷日用）。
   const sitWholesale = sitRows[0]?.cw == null ? null : num(sitRows[0].cw);
+  const sitDelivery: string | null = dval(sitRows[0]?.cd) ?? null;
   // カラー名→ZOZOBO並び順位（未登録色は末尾）
   const colorRank: Record<string, number> = {};
   for (const r of colorOrderRows) colorRank[String(r.cn)] = Number(r.rank);
@@ -416,7 +418,10 @@ export async function fetchPlan1(pc: string, start: string, end: string,
       last_order_date: ordMap[sk]?.od ?? null,
       // 前回原価: MMS発注単価(>0)優先 → sitateru確定卸値 → MMS評価額(最新加重平均) でフォールバック（顧客2026）。
       last_cost: (ordMap[sk]?.up && ordMap[sk]!.up! > 0) ? ordMap[sk]!.up : (sitWholesale ?? costMap[sk] ?? null),
-      latest_avg_cost: costMap[sk] ?? null, last_arrival_date: arrMap[sk] ?? null,
+      // 最新加重平均原価: MMS評価額(>0)優先 → 委託PF品番等で0/無い時はPF下代で補完（顧客2026・BLEsh1667）。
+      latest_avg_cost: (costMap[sk] && costMap[sk]! > 0) ? costMap[sk] : (pfCost ?? null),
+      // 最終入荷日: 倉庫在庫の入荷日(SKU別・№12除外)優先 → 在庫無し等で拾えない時はsitateru確定納品日で補完。
+      last_arrival_date: arrMap[sk] ?? sitDelivery,
       current_stock: cur, recommended_qty: recommended, recommended_provisional: true,
       corrected_velo: r2(correctedVelo), velo_basis: veloBasis, confirmed_qty: null,
       s7_qty: s7Qty, s7_daily_avg: s7Avg, s7_stock_days: s7Days, s7_sellout: s7Sellout,

@@ -99,7 +99,7 @@ export async function fetchPlan2(pc: string, start: string, end: string,
     { pc }))[0];
   if (canonRow?.p) pc = canonRow.p;
 
-  const [ordRows, uuRows, costRows, incRows, stkRows, cdaysRows, exclRows, pivRows, colorOrderRows] = await Promise.all([
+  const [ordRows, uuRows, costRows, incRows, sitDelivRows, stkRows, cdaysRows, exclRows, pivRows, colorOrderRows] = await Promise.all([
     // 日次 受注（販売数/売上/上代/予約販売数）
     q(`SELECT CAST(sale_date AS STRING) d, SUM(sales_quantity) qty, SUM(sales_amount) rev,
          SUM(proper_price*sales_quantity) lst, SUM(IF(sale_type LIKE '%予約%', sales_quantity, 0)) yqty
@@ -122,11 +122,20 @@ export async function fetchPlan2(pc: string, start: string, end: string,
                   WHERE product_code=@pc AND valid_to IS NULL GROUP BY sk)
        SELECT s.d, SUM(s.qty*COALESCE((SELECT val FROM pfc), c.vp, 0)) cost FROM s LEFT JOIN c ON c.sk=s.sk GROUP BY s.d`,
       { pc, sd: fetchStart, ed: end, ...(exNorm.length ? { excl: exNorm } : {}) }),
-    // 入荷数量（着日別・最新スナップショット）
+    // 入荷数量（着日別・最新スナップショット）。incoming_stockは未入荷(将来)中心。
     q(`SELECT CAST(SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE) AS STRING) d, SUM(incoming_qty) q
        FROM ${T('incoming_stock')} WHERE product_code=@pc AND earliest_arrival_date IS NOT NULL
          AND source_date=(SELECT MAX(source_date) FROM ${T('incoming_stock')} WHERE product_code=@pc)
        GROUP BY d HAVING d IS NOT NULL`, { pc }),
+    // sitateru 確定納品（過去の実入荷）— incoming_stockに無い過去入荷を補完（顧客2026・FOcd919 3月入荷）。
+    //   sitateruは複数スナップショット行があるため、item_id毎に最新スナップショットだけ採用して二重計上を防ぐ。
+    q(`WITH latest AS (
+         SELECT sitateru_item_id, confirmed_delivery_date, actual_delivery_qty,
+                ROW_NUMBER() OVER (PARTITION BY sitateru_item_id ORDER BY snapshot_date DESC) rn
+         FROM ${T('sitateru_item_master')} WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc))
+           AND confirmed_delivery_date IS NOT NULL AND actual_delivery_qty>0)
+       SELECT CAST(SAFE_CAST(REPLACE(confirmed_delivery_date,'/','-') AS DATE) AS STRING) d, SUM(actual_delivery_qty) q
+       FROM latest WHERE rn=1 GROUP BY d HAVING d IS NOT NULL`, { pc }),
     // 在庫（当時・日次スナップショット）
     q(`SELECT CAST(snapshot_date AS STRING) d, SUM(available_qty) s FROM ${T('stock_analysis')}
        WHERE product_code=@pc AND snapshot_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d`,
@@ -165,6 +174,8 @@ export async function fetchPlan2(pc: string, start: string, end: string,
   const uu = mapBy(uuRows, (r) => ({ uu: num(r.uu), fav: num(r.fav) }));
   const cost = mapBy(costRows, (r) => num(r.cost));
   const inc = mapBy(incRows, (r) => num(r.q));
+  // sitateru確定納品（過去の実入荷）を入荷数量に合算（同日はincoming_stockと加算）。
+  for (const r of sitDelivRows) { const d = dstr(r.d) ?? ''; if (d) inc[d] = (inc[d] ?? 0) + num(r.q); }
   const stk = mapBy(stkRows, (r) => num(r.s));
   const cdays = new Set(cdaysRows.map((r) => dstr(r.d)));
   const excl = new Set(exclRows.map((r) => dstr(r.d)));
