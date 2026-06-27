@@ -103,7 +103,8 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
     setOutMsg('スプシ出力中…'); setOutUrl(null);
     try {
       const ex = [...excluded].join(',');
-      const res = await fetch(`/api/order-plan1/to-sheet?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}${ex ? `&exclude=${encodeURIComponent(ex)}` : ''}`, { method: 'POST' });
+      // 統合出力: 1ファイルに「期間集計＋推移集計」の2タブを作成（顧客要望）。
+      const res = await fetch(`/api/order-plan/to-sheet?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}${ex ? `&exclude=${encodeURIComponent(ex)}` : ''}`, { method: 'POST' });
       const j = await res.json();
       if (res.ok) { setOutMsg(`✓ 新規スプレッドシート「${j.filename}」を作成しました（${j.rows}行）`); setOutUrl(j.url || null); }
       else setOutMsg(`エラー: ${j.error || '失敗'}`);
@@ -138,10 +139,11 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
 
   // 顧客#1: 品番合計から「集計対象外SKU」を除外。除外ゼロ時はサーバ値（厳密一致）、除外時のみ再計算。
   const round1 = (x: number) => Math.round(x * 10) / 10;
+  const sumRev = activeRows.reduce((a, s) => a + (s.period_rev || 0), 0);  // 合計販売額（実売上）
   const hdr = excluded.size === 0
-    ? { qty: h.total_qty, lst: h.total_list_amount, margin: h.total_margin_pct, discount: h.total_discount_pct }
+    ? { qty: h.total_qty, lst: h.total_list_amount, margin: h.total_margin_pct, discount: h.total_discount_pct, rev: sumRev }
     : (() => {
-        const rev = activeRows.reduce((a, s) => a + (s.period_rev || 0), 0);
+        const rev = sumRev;
         const cost = activeRows.reduce((a, s) => a + (s.period_cost || 0), 0);
         const lst = activeRows.reduce((a, s) => a + (s.period_lst || 0), 0);
         const qty = activeRows.reduce((a, s) => a + (s.sales_qty || 0), 0);
@@ -150,6 +152,7 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
           lst: lst || null,
           margin: rev > 0 ? round1((rev - cost) / rev * 100) : null,
           discount: lst > 0 ? round1((1 - rev / lst) * 100) : null,
+          rev,
         };
       })();
   const totalLabel = excluded.size > 0 ? `（集計対象 ${activeRows.length}/${data.skus.length} SKU）` : '';
@@ -217,10 +220,10 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
         <Field label="商品タイプ" value={`${h.item_type_parent ?? '—'} / ${h.item_type_child ?? '—'}`} />
         <Field label="集計期間" value={`${d(h.start)} 〜 ${d(h.end)}`} />
         <Field label="累計レビュー" value={`${n(h.review_count)}件 / ${h.review_avg ?? '—'}点`} />
-        <Field label={`合計粗利率${totalLabel}`} value={hdr.margin == null ? '—' : `${hdr.margin}%`}
+        <Field label={`合計粗利率${totalLabel}`} value={hdr.margin == null ? '—' : `${hdr.margin.toFixed(1)}%`}
           warn={hdr.margin != null && hdr.margin < 0} badge="原価割れ" />
-        <Field label={`合計値引率${totalLabel}`} value={hdr.discount == null ? '—' : `${hdr.discount}%`} />
-        <Field label={`合計上代額${totalLabel}`} value={n(hdr.lst, '円')} />
+        <Field label={`合計値引率${totalLabel}`} value={hdr.discount == null ? '—' : `${hdr.discount.toFixed(1)}%`} />
+        <Field label={`合計販売額${totalLabel}`} value={n(hdr.rev, '円')} />
         <Field label={`合計販売数${totalLabel}`} value={n(hdr.qty, '点')} />
       </div>
 
@@ -374,10 +377,10 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
                 </Td>
                 {totalQty > 0 && <Td num cls="bg-indigo-100 font-semibold">{n(allocShort[s.sku_code ?? ''] ?? 0)}</Td>}
                 {totalQty > 0 && <Td num cls="bg-purple-100 font-semibold">{n(allocSales[s.sku_code ?? ''] ?? 0)}</Td>}
-                <Td num cls="bg-sky-50">{n(s.s7_qty)}</Td><Td num cls="bg-sky-50">{s.s7_daily_avg ?? '—'}</Td>
-                <Td num cls="bg-sky-50">{s.s7_stock_days == null ? '—' : `${s.s7_stock_days}日`}</Td><Td cls="bg-sky-50">{d(s.s7_sellout)}</Td>
+                <Td num cls="bg-sky-50">{n(s.s7_qty)}</Td><Td num cls="bg-sky-50">{s.s7_daily_avg == null ? '—' : s.s7_daily_avg.toFixed(1)}</Td>
+                <Td num cls="bg-sky-50">{s.s7_stock_days == null ? '—' : `${Math.round(s.s7_stock_days)}日`}</Td><Td cls="bg-sky-50">{d(s.s7_sellout)}</Td>
                 <Td num cls="bg-teal-50">{n(s.l30_qty)}</Td><Td num cls="bg-teal-50">{s.l30_daily_median ?? '—'}</Td>
-                <Td num cls="bg-teal-50">{s.l30_stock_days == null ? '—' : `${s.l30_stock_days}日`}</Td><Td cls="bg-teal-50">{d(s.l30_sellout)}</Td>
+                <Td num cls="bg-teal-50">{s.l30_stock_days == null ? '—' : `${Math.round(s.l30_stock_days)}日`}</Td><Td cls="bg-teal-50">{d(s.l30_sellout)}</Td>
                 <Td num cls="bg-violet-50">{n(s.free_stock)}</Td>
                 <Td num cls="bg-violet-50">{s.free_stock_days == null ? '—' : `${s.free_stock_days}日`}</Td>
                 <Td num cls="bg-violet-50">{n(s.reserved_pending)}</Td>

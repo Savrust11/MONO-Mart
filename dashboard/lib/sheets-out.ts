@@ -170,6 +170,72 @@ export async function writeMatrixToNewSheet(
   return { rows: values.length, url: `https://docs.google.com/spreadsheets/d/${ssId}/edit`, filename };
 }
 
+// 1つの新規スプレッドシートに複数タブ（期間集計＋推移集計など）を書き込む。
+export async function writeMultiSheetToNewSheet(
+  baseName: string,
+  sheets: { tabName: string; values: (string | number)[][]; opts?: WriteOpts }[],
+): Promise<{ rows: number; url: string; filename: string }> {
+  const token = await getUserDriveToken();
+  const hdr = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+  // 1) 連番ファイル名
+  const q = `'${OUTPUT_FOLDER_ID}' in parents and name contains '${baseName}' and trashed=false`;
+  const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}`
+    + `&fields=files(name)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+  const listRes = await fetch(listUrl, { headers: hdr });
+  if (!listRes.ok) throw new Error(`フォルダ照会失敗 ${listRes.status}: ${(await listRes.text()).slice(0, 200)}`);
+  const re = new RegExp('^' + baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '-(\\d+)$');
+  let maxN = 0;
+  for (const f of ((await listRes.json()).files || [])) {
+    const m = re.exec(f.name || ''); if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+  }
+  const filename = `${baseName}-${maxN + 1}`;
+
+  // 2) 空のスプレッドシートを新規作成
+  const createRes = await fetch(
+    'https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id',
+    { method: 'POST', headers: hdr, body: JSON.stringify({
+        name: filename, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [OUTPUT_FOLDER_ID],
+      }) });
+  if (!createRes.ok) throw new Error(`新規スプシ作成失敗 ${createRes.status}: ${(await createRes.text()).slice(0, 200)}`);
+  const ssId = (await createRes.json()).id as string;
+
+  // 3) 既定タブを1枚目にリネーム＋残りのタブを追加。sheetId を回収する。
+  const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssId}?fields=sheets(properties(sheetId,title))`, { headers: hdr });
+  const defaultSheetId = (await metaRes.json()).sheets[0].properties.sheetId as number;
+  const reqs: unknown[] = [{ updateSheetProperties: { properties: { sheetId: defaultSheetId, title: sheets[0].tabName }, fields: 'title' } }];
+  for (let i = 1; i < sheets.length; i++) reqs.push({ addSheet: { properties: { title: sheets[i].tabName } } });
+  const buRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssId}:batchUpdate`, {
+    method: 'POST', headers: hdr, body: JSON.stringify({ requests: reqs }),
+  });
+  if (!buRes.ok) throw new Error(`タブ作成失敗 ${buRes.status}: ${(await buRes.text()).slice(0, 150)}`);
+  const replies = (await buRes.json()).replies || [];
+  const sheetIds = [defaultSheetId];
+  for (let i = 1; i < sheets.length; i++) sheetIds.push(replies[i].addSheet.properties.sheetId as number);
+
+  // 4) 各タブへ値を書き込み＋5) 書式
+  let totalRows = 0;
+  for (let i = 0; i < sheets.length; i++) {
+    const { tabName, values, opts } = sheets[i];
+    const range = encodeURIComponent(`'${tabName}'!A1`);
+    const upd = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssId}/values/${range}?valueInputOption=${opts?.valueInputOption ?? 'RAW'}`, {
+      method: 'PUT', headers: hdr, body: JSON.stringify({ values }),
+    });
+    if (!upd.ok) throw new Error(`書込失敗(${tabName}) ${upd.status}: ${(await upd.text()).slice(0, 150)}`);
+    if (opts?.format) {
+      const fmtReqs = opts.format(sheetIds[i], values);
+      if (fmtReqs.length) {
+        const fmt = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssId}:batchUpdate`, {
+          method: 'POST', headers: hdr, body: JSON.stringify({ requests: fmtReqs }),
+        });
+        if (!fmt.ok) throw new Error(`書式適用失敗(${tabName}) ${fmt.status}: ${(await fmt.text()).slice(0, 150)}`);
+      }
+    }
+    totalRows += values.length;
+  }
+  return { rows: totalRows, url: `https://docs.google.com/spreadsheets/d/${ssId}/edit`, filename };
+}
+
 // 2次元配列 → CSV文字列（UTF-8 BOM, Excel文字化け回避）
 export function matrixToCsv(values: (string | number)[][]): string {
   const esc = (s: unknown): string => {

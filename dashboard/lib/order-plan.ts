@@ -104,7 +104,7 @@ export interface Plan1 {
     brand: string | null; item_type_parent: string | null; item_type_child: string | null;
     review_count: number | null; review_avg: number | null;
     total_margin_pct: number | null; total_discount_pct: number | null;
-    total_list_amount: number | null; total_qty: number;
+    total_list_amount: number | null; total_revenue: number | null; total_qty: number;
   };
   skus: Plan1Sku[];
 }
@@ -463,7 +463,7 @@ export function plan1ToMatrix(p: Plan1, excludedColors?: Set<string>): (string |
     ['累計レビュー点数', v(h.review_avg)],
     ['合計粗利率', pctv(h.total_margin_pct)],
     ['合計値引率', pctv(h.total_discount_pct)],
-    ['合計上代額', v(h.total_list_amount)],
+    ['合計販売額', v(h.total_revenue)],
     ['合計枚数', h.total_qty],
   ];
   const m: (string | number)[][] = [...head];
@@ -562,6 +562,6 @@ async function fetchHeader(pc: string, start: string, end: string, asof: string)
     review_count: rv[0]?.c != null ? num(rv[0].c) : null,
     review_avg: rv[0]?.a != null ? r2(num(rv[0].a)) : null,
     total_margin_pct: margin, total_discount_pct: discount,
-    total_list_amount: tls || null, total_qty: tq,
+    total_list_amount: tls || null, total_revenue: trv || null, total_qty: tq,
   };
 }

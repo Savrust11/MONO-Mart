@@ -36,7 +36,8 @@ export function Plan2View({ code, start, end, excluded }:
   const toSheet = useCallback(async () => {
     setOutMsg('スプシ出力中…'); setOutUrl(null);
     try {
-      const res = await fetch(`/api/order-plan2/to-sheet?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}${exParam ? `&exclude=${encodeURIComponent(exParam)}` : ''}`, { method: 'POST' });
+      // 統合出力: 1ファイルに「期間集計＋推移集計」の2タブを作成（顧客要望）。
+      const res = await fetch(`/api/order-plan/to-sheet?product_code=${encodeURIComponent(code)}&start=${start}&end=${end}${exParam ? `&exclude=${encodeURIComponent(exParam)}` : ''}`, { method: 'POST' });
       const j = await res.json();
       if (res.ok) { setOutMsg(`✓ 新規スプレッドシート「${j.filename}」を作成しました（${j.rows}行）`); setOutUrl(j.url || null); }
       else setOutMsg(`エラー: ${j.error || '失敗'}`);
