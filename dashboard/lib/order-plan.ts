@@ -208,11 +208,18 @@ export async function fetchPlan1(pc: string, start: string, end: string,
               OR SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE)
                  <= DATE_ADD(DATE(@asof), INTERVAL ${cutoffDays} DAY))
        GROUP BY sk`, { pc, asof }),
-    // 入荷山1/2/3（品番単位・将来着）
-    q(`SELECT SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE) d, SUM(incoming_qty) q
+    // 入荷残（SKU別×着荷日）。顧客指摘: 従来は品番合計を全SKUに同数表示していた→SKU別に修正。
+    //   sku_code は「品番+SKU」連結なので接頭辞を除去。フリー在庫と整合するよう N日カットオフを適用。
+    q(`SELECT UPPER(TRIM(
+                CASE WHEN STARTS_WITH(UPPER(TRIM(sku_code)), UPPER(TRIM(product_code)))
+                     THEN SUBSTR(TRIM(sku_code), LENGTH(TRIM(product_code)) + 1)
+                     ELSE sku_code END)) sk,
+              SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE) d, SUM(incoming_qty) q
        FROM ${T('incoming_stock')} WHERE product_code=@pc AND earliest_arrival_date IS NOT NULL
          AND source_date=(SELECT MAX(source_date) FROM ${T('incoming_stock')} WHERE product_code=@pc)
-       GROUP BY d HAVING d IS NOT NULL AND d>=DATE(@asof) ORDER BY d LIMIT 3`, { pc, asof }),
+       GROUP BY sk, d
+       HAVING d IS NOT NULL AND d <= DATE_ADD(DATE(@asof), INTERVAL ${cutoffDays} DAY)
+       ORDER BY sk, d`, { pc, asof }),
     // ヘッダ用 品番属性・レビュー・合計粗利率/値引率
     fetchHeader(pc, start, end, asof),
     // 商品画像（カラー別）R02: color_master のカラーID → o.imgz.jp URL
@@ -306,7 +313,9 @@ export async function fetchPlan1(pc: string, start: string, end: string,
   const productTotalQty = Object.values(colorTotal).reduce((a, b) => a + b, 0);
 
   // 入荷山（共通）
-  const arrList = arrivals.map((r) => ({ d: dval(r.d), q: num(r.q) }));
+  // 入荷残をSKU別に整理（着荷日昇順）。各SKUは自分の入荷分だけを持つ。
+  const arrBySku: Record<string, { d: string | null; q: number }[]> = {};
+  for (const r of arrivals) (arrBySku[r.sk] ??= []).push({ d: dval(r.d), q: num(r.q) });
 
   const daysS = Array.from({ length: WIN_SHORT }, (_, i) => addDays(asof, -i));
   const daysL = Array.from({ length: WIN_LONG }, (_, i) => addDays(asof, -i));
@@ -394,9 +403,9 @@ export async function fetchPlan1(pc: string, start: string, end: string,
       s7_qty: s7Qty, s7_daily_avg: s7Avg, s7_stock_days: s7Days, s7_sellout: s7Sellout,
       l30_qty: l30Qty, l30_daily_median: l30Med, l30_stock_days: l30Days, l30_sellout: l30Sellout,
       free_stock: free, free_stock_days: freeDays, reserved_pending: reserved,
-      arr1_date: arrList[0]?.d ?? null, arr1_qty: arrList[0]?.q ?? null,
-      arr2_date: arrList[1]?.d ?? null, arr2_qty: arrList[1]?.q ?? null,
-      arr3_date: arrList[2]?.d ?? null, arr3_qty: arrList[2]?.q ?? null,
+      arr1_date: arrBySku[sk]?.[0]?.d ?? null, arr1_qty: arrBySku[sk]?.[0]?.q ?? null,
+      arr2_date: arrBySku[sk]?.[1]?.d ?? null, arr2_qty: arrBySku[sk]?.[1]?.q ?? null,
+      arr3_date: arrBySku[sk]?.[2]?.d ?? null, arr3_qty: arrBySku[sk]?.[2]?.q ?? null,
     };
   });
 
