@@ -187,7 +187,7 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
     return Array.from(set).sort();
   })();
   // テーブル総列数（除外行の colSpan 用）。先頭4列（集計不要/カラー/サイズ/SKU品番）以外をまとめる。
-  const COLS = 16 + (totalQty > 0 ? 2 : 0) + 4 + 4 + 3 + Math.max(1, arrivalDates.length);
+  const COLS = 16 + (totalQty > 0 ? 2 : 0) + 4 + 4 + 3 + 1 + Math.max(1, arrivalDates.length);  // +1=入荷残合計列
   // 顧客#6: 全SKUが「集計不要」のカラーは、画像を2段目（集計対象外・斜線/グレー）へ移す。
   const excludedColors = new Set(
     Array.from(new Set(data.skus.map((s) => s.color_name).filter((c): c is string => !!c)))
@@ -202,6 +202,7 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
     if (s.arr3_date === dt) q += s.arr3_qty ?? 0;
     return q;
   };
+  const arrTotalOf = (s: Plan1Sku): number => (s.arr1_qty ?? 0) + (s.arr2_qty ?? 0) + (s.arr3_qty ?? 0);
 
   return (
     <div className="p-4 space-y-4">
@@ -306,7 +307,7 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
               <th colSpan={4} className="px-2 py-1 border border-gray-200 bg-sky-100 text-center">▼直近7日</th>
               <th colSpan={4} className="px-2 py-1 border border-gray-200 bg-teal-100 text-center">▼直近30日</th>
               <th colSpan={3} className="px-2 py-1 border border-gray-200 bg-violet-100 text-center">フリー在庫・予約</th>
-              <th colSpan={Math.max(1, arrivalDates.length)} className="px-2 py-1 border border-gray-200 bg-amber-100 text-center">入荷残（日付別）</th>
+              <th colSpan={1 + Math.max(1, arrivalDates.length)} className="px-2 py-1 border border-gray-200 bg-amber-100 text-center">入荷残（合計・日付別）</th>
             </tr>
             <tr className="bg-gray-100 text-gray-600">
               <Th>集計不要</Th><Th>カラー</Th><Th>サイズ</Th><Th>SKU品番</Th><Th>上代</Th><Th>販売タイプ</Th>
@@ -318,6 +319,7 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
               <Th cls="bg-sky-50">7日販売数</Th><Th cls="bg-sky-50">日販平均</Th><Th cls="bg-sky-50">在庫日数</Th><Th cls="bg-sky-50">完売想定日</Th>
               <Th cls="bg-teal-50">30日販売数</Th><Th cls="bg-teal-50">日販中央値</Th><Th cls="bg-teal-50">在庫日数</Th><Th cls="bg-teal-50">完売想定日</Th>
               <Th cls="bg-violet-50">フリー在庫数</Th><Th cls="bg-violet-50">フリー在庫日数</Th><Th cls="bg-violet-50">予約未処理</Th>
+              <Th cls="bg-amber-100 font-bold">入荷残合計</Th>
               {arrivalDates.length === 0
                 ? <Th cls="bg-amber-50">入荷予定</Th>
                 : arrivalDates.map((dt) => <Th key={dt} cls="bg-amber-50">{d(dt)}</Th>)}
@@ -379,11 +381,15 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
                 <Td num cls="bg-violet-50">{n(s.free_stock)}</Td>
                 <Td num cls="bg-violet-50">{s.free_stock_days == null ? '—' : `${s.free_stock_days}日`}</Td>
                 <Td num cls="bg-violet-50">{n(s.reserved_pending)}</Td>
+                {(() => { const t = arrTotalOf(s); return (
+                  <Td num cls={`font-bold ${t > 0 ? 'bg-amber-100 text-amber-800' : 'bg-amber-50 text-gray-300'}`}>{t > 0 ? n(t) : '—'}</Td>
+                ); })()}
                 {arrivalDates.length === 0
-                  ? <Td num cls="bg-amber-50">—</Td>
+                  ? <Td num cls="bg-amber-50 text-gray-300">—</Td>
                   : arrivalDates.map((dt) => {
                       const q = arrQtyOf(s, dt);
-                      return <Td key={dt} num cls="bg-amber-50">{q > 0 ? n(q) : '—'}</Td>;
+                      // 入荷がある日は色付け（琥珀）、無い日は薄いグレーの「—」で見やすく
+                      return <Td key={dt} num cls={q > 0 ? 'bg-amber-100 text-amber-800 font-semibold' : 'bg-amber-50/40 text-gray-300'}>{q > 0 ? n(q) : '—'}</Td>;
                     })}
               </tr>
               );
