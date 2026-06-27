@@ -200,6 +200,40 @@ def filter_2day_lag(page: Page, target_date: str) -> None:
         pass
 
 
+def set_looker_date_last7(dash) -> bool:
+    """商品別実績などLooker日付フィルタを「最後 7 日間」に設定。
+    既定が「前週」だと先週(〜先週末)までしか取れず最新日が欠ける（顧客2026）。
+    最後7日間にすると2日ラグ込みの最新まで取得できる。"""
+    try:
+        # 1) 日付チップ（前週/今日/◯日間 等の日付トークン）を開く
+        opened = dash.evaluate(r"""() => {
+          const tokens = [...document.querySelectorAll('[data-testid="filter-token"]')];
+          for (const t of tokens) {
+            const txt = (t.innerText||'').replace(/\s+/g,' ').trim();
+            if (/前週|今週|^週|日間|昨日|今日|前日|前々日/.test(txt)) {
+              t.scrollIntoView({block:'center'}); t.click(); return txt;
+            }
+          }
+          return '';
+        }""")
+        if not opened:
+            return False
+        time.sleep(2)
+        # 2) 「最後 7 日間」を選択
+        dash.get_by_text("最後 7 日間").first.click(timeout=5_000)
+        time.sleep(2)
+        # 3) 更新/適用（あれば）
+        for sel in ("button:has-text('更新')", "button:has-text('適用')"):
+            loc = dash.locator(sel)
+            if loc.count() > 0 and loc.first.is_visible():
+                loc.first.click(timeout=3_000)
+                break
+        time.sleep(8)
+        return True
+    except Exception:
+        return False
+
+
 def filter_stock_analysis_options(page: Page, target_date: str) -> None:
     """Enable ALL optional display columns in 在庫分析データ (StockAnalysis.asp).
 
@@ -1116,6 +1150,12 @@ class ZOZOScraper:
                     break
             except Exception:
                 pass
+
+        # 日付フィルタを「最後7日間」に（既定の前週だと最新日が取れない・顧客2026）。
+        # 商品別実績(has_2day_lag)で適用。失敗時は既定のまま続行（非致命）。
+        if src.has_2day_lag:
+            ok = set_looker_date_last7(dash)
+            logger.info("   looker date filter -> 最後7日間: %s", ok)
 
         # ── Tab navigation (rpid=9 App/PC-SP(ショップ親カテゴリ) etc.) ──
         # Looker tabs live in the EXTENSION iframe, not the dashboard iframe.
