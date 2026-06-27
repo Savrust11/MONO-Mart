@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchPlan1, plan1ToMatrix, PLAN1_GROUP_MARK, PLAN1_TABLE_COLS } from '@/lib/order-plan';
+import { fetchPlan1, plan1ToMatrix, PLAN1_GROUP_MARK, PLAN1_TABLE_COLS, PLAN1_EXCLUDED_MARK } from '@/lib/order-plan';
 import { writeMatrixToNewSheet } from '@/lib/sheets-out';
 
 // 顧客#9: ファイル名の日付（JST・出力日）= YYYYMMDD
@@ -43,6 +43,23 @@ function buildPlan1Format(sheetId: number, values: (string | number)[][]): unkno
       range: { sheetId, dimension: 'ROWS', startIndex: ri, endIndex: ri + 1 },
       properties: { pixelSize: 96 }, fields: 'pixelSize' } });
   }
+
+  // 集計対象外カラー: 名前セルを赤＋取消線に、直上の画像セルを赤枠で囲む（斜線は描けないため同等表現）。
+  const red = { red: 0.86, green: 0.15, blue: 0.15 };
+  values.forEach((row, ri) => {
+    row.forEach((c, ci) => {
+      if (typeof c === 'string' && c.endsWith(PLAN1_EXCLUDED_MARK)) {
+        reqs.push({ repeatCell: {
+          range: { sheetId, startRowIndex: ri, endRowIndex: ri + 1, startColumnIndex: ci, endColumnIndex: ci + 1 },
+          cell: { userEnteredFormat: { textFormat: { foregroundColor: red, strikethrough: true, bold: true } } },
+          fields: 'userEnteredFormat.textFormat' } });
+        if (ri > 0) reqs.push({ updateBorders: {
+          range: { sheetId, startRowIndex: ri - 1, endRowIndex: ri, startColumnIndex: ci, endColumnIndex: ci + 1 },
+          top: { style: 'SOLID_THICK', color: red }, bottom: { style: 'SOLID_THICK', color: red },
+          left: { style: 'SOLID_THICK', color: red }, right: { style: 'SOLID_THICK', color: red } } });
+      }
+    });
+  });
 
   // テーブルの色帯・ハイライト
   const g = values.findIndex((row) => row[0] === PLAN1_GROUP_MARK); // グループ見出し行
@@ -120,8 +137,15 @@ export async function POST(req: NextRequest) {
 
   try {
     const plan = await fetchPlan1(pc, start, end);
-    // 集計不要SKUを除外し、品番合計（粗利率/値引率/上代/枚数）を有効SKUで再計算（画面と一致）。
+    // 全SKUが集計不要のカラー＝「集計対象外カラー」。画像は別セクション（赤＋取消線＋赤枠）で参考表示。
+    let excludedColors: Set<string> | undefined;
     if (exclude.size > 0) {
+      const colors = new Set(plan.skus.map((s) => s.color_name).filter((c): c is string => !!c));
+      excludedColors = new Set([...colors].filter((c) => {
+        const g = plan.skus.filter((s) => s.color_name === c);
+        return g.length > 0 && g.every((s) => exclude.has((s.sku_code ?? '').toUpperCase()));
+      }));
+      // 集計不要SKUを除外し、品番合計（粗利率/値引率/上代/枚数）を有効SKUで再計算（画面と一致）。
       const active = plan.skus.filter((s) => !exclude.has((s.sku_code ?? '').toUpperCase()));
       const rev = active.reduce((a, s) => a + (s.period_rev || 0), 0);
       const cost = active.reduce((a, s) => a + (s.period_cost || 0), 0);
@@ -136,7 +160,7 @@ export async function POST(req: NextRequest) {
         total_qty: qty,
       };
     }
-    const matrix = plan1ToMatrix(plan);
+    const matrix = plan1ToMatrix(plan, excludedColors);
     // 顧客#8/#9/#10: 出力ごとに独立スプシを `品番-日付-連番` で新規作成（上書き・色残り解消）
     // =IMAGE / %表示のため USER_ENTERED、書式（色帯・ハイライト）も適用
     const res = await writeMatrixToNewSheet(`${pc}-${jstYmd()}`, '期間集計', matrix, {
