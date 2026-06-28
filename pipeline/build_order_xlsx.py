@@ -5,8 +5,9 @@
 本スクリプトは ZOZO取得に依存しない BigQuery だけで生成するため、私の環境(Linux)で毎日確実に動く。
 
 データ源:
-  ・母集合 = 最新在庫スナップショットの品番×SKU ∪ 直近30日に受注のある品番×SKU
-            （在庫が壊れていても「売れている品番」は必ず網羅される）
+  ・母集合 = 最新在庫スナップショット ∪ 直近30日受注 ∪ MMS発注実績(発注書一覧)
+            （倉庫在庫だけだと売り切れ=在庫0の商品が漏れるため、過去に発注した商品も
+              MMSから必ず拾う＝顧客要件。予約管理表は季節入替で不安定なため不採用）
   ・7日/30日販売 = sales_daily の最新受注日基準（常に最新）
   ・在庫/入荷残/予約 = 取得できている最新スナップショット（best-effort）
   ・原価 = PF手数料表(下代・品番単位)優先 → MMS評価額(SKU単位)
@@ -72,10 +73,20 @@ mms AS (
     SELECT UPPER(TRIM(product_code)) pc, UPPER(TRIM(sku_code)) sk, valuation_price vp,
            ROW_NUMBER() OVER (PARTITION BY UPPER(TRIM(product_code)), UPPER(TRIM(sku_code)) ORDER BY source_date DESC) rn
     FROM `{A}.cost_master`) WHERE rn=1),
+-- MMS発注実績（発注書一覧）の (品番,SKU)。過去に発注した商品を母集合に足すための種。
+mord AS (
+  SELECT DISTINCT UPPER(TRIM(product_code)) pc, UPPER(TRIM(sku_code)) sk
+  FROM `{A}.mms_orders`),
 universe AS (
+  -- 顧客要件: 倉庫在庫を起点にすると売り切れ(在庫0)の商品が母集合から漏れる。
+  --   そこで MMS発注実績(mord) を足し、過去に発注した商品は在庫0でも必ず拾う。
+  --   （予約管理表は yySS/yyAW で毎シーズン入替・アーカイブされ不安定なため不採用＝顧客見解どおり）
+  --   商品マスタ全件は廃番含む14万SKUで7倍に膨張するため足さない。
   SELECT pc, sk FROM inv
   UNION DISTINCT
-  SELECT pc, sk FROM s30)
+  SELECT pc, sk FROM s30
+  UNION DISTINCT
+  SELECT pc, sk FROM mord)
 SELECT
   COALESCE(inv.pc_disp, pm.pc_disp, u.pc) AS product_code,
   COALESCE(inv.nm, pm.nm) AS product_name,
