@@ -73,15 +73,20 @@ mms AS (
     SELECT UPPER(TRIM(product_code)) pc, UPPER(TRIM(sku_code)) sk, valuation_price vp,
            ROW_NUMBER() OVER (PARTITION BY UPPER(TRIM(product_code)), UPPER(TRIM(sku_code)) ORDER BY source_date DESC) rn
     FROM `{A}.cost_master`) WHERE rn=1),
--- MMS発注実績（発注書一覧）の (品番,SKU)。過去に発注した商品を母集合に足すための種。
+-- MMS発注実績のある品番の「商品マスタ全SKU」。過去に発注した商品を母集合に足すための種。
+--   MMSのsku_codeを直接使わない理由: 発注書には sku_code 空欄の行があり(=品番単位の発注)、
+--   そのまま使うと色・名称が空の幽霊行になる。商品マスタ経由なら色名が必ず付き、空欄も排除できる。
 mord AS (
-  SELECT DISTINCT UPPER(TRIM(product_code)) pc, UPPER(TRIM(sku_code)) sk
-  FROM `{A}.mms_orders`),
+  SELECT DISTINCT UPPER(TRIM(pm.product_code)) pc, UPPER(TRIM(pm.sku_code)) sk
+  FROM `{A}.product_master` pm
+  WHERE UPPER(TRIM(pm.product_code)) IN (
+    SELECT UPPER(TRIM(product_code)) FROM `{A}.mms_orders` WHERE TRIM(IFNULL(product_code,''))!='')),
 universe AS (
   -- 顧客要件: 倉庫在庫を起点にすると売り切れ(在庫0)の商品が母集合から漏れる。
-  --   そこで MMS発注実績(mord) を足し、過去に発注した商品は在庫0でも必ず拾う。
+  --   そこで「MMSで発注実績のある品番」の商品マスタ全SKU(mord)を足し、過去に発注した
+  --   商品は在庫0でも必ず・色名つきで拾う。
   --   （予約管理表は yySS/yyAW で毎シーズン入替・アーカイブされ不安定なため不採用＝顧客見解どおり）
-  --   商品マスタ全件は廃番含む14万SKUで7倍に膨張するため足さない。
+  --   商品マスタ全件(14万)は廃番含み7倍膨張のため不採用。MMS発注のある1,089品番分だけに限定。
   SELECT pc, sk FROM inv
   UNION DISTINCT
   SELECT pc, sk FROM s30
