@@ -30,6 +30,7 @@ export function OrderAnalysisView() {
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    setBusy(true);   // 顧客要望2026: フィルタ変更などの再取得時も円形プログレスを表示
     setError(null);
     try {
       const params = new URLSearchParams({ date: date || 'latest', limit: '1000' });
@@ -91,10 +92,10 @@ export function OrderAnalysisView() {
   const overstockCount = simulatedRows.filter((r) => r.order_urgency === 'OVERSTOCK').length;
   const totalOrderQty  = simulatedRows.reduce((s, r) => s + (r.recommended_order_qty || 0), 0);
 
-  // 初回ロードは円形プログレスを100%まで見せてから本体表示（他画面と同パターン）
+  // 初回ロード＋フィルタ再取得中は円形プログレスを表示し、完了で100%にしてから本体表示。
   if (busy) return (
     <div className="px-6 py-4">
-      <CircularProgress active={!loadedOnce} label="発注推奨データを集計中" onDone={() => setBusy(false)} />
+      <CircularProgress active={isLoading} label={loadedOnce ? '絞り込みを集計中' : '発注推奨データを集計中'} onDone={() => setBusy(false)} />
     </div>
   );
 

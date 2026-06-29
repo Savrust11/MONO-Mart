@@ -15,6 +15,7 @@ export function CircularProgress({ active, label = '読み込み中', size = 132
 
   useEffect(() => {
     if (active) {
+      setPct(6);   // 再取得（フィルタ変更等）でも 6%→92% の上昇を毎回やり直す
       idRef.current = setInterval(() => {
         setPct((p) => Math.min(92, p + Math.max(0.5, (92 - p) * 0.08)));
       }, 130);
