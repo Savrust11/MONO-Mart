@@ -429,7 +429,10 @@ export async function fetchPlan1(pc: string, start: string, end: string,
       period_rev: periodRev, period_cost: periodCost, period_lst: periodLst, fku_share: fku,
       last_order_date: ordMap[sk]?.od ?? null,
       // 前回原価: MMS発注単価(>0)優先 → sitateru確定卸値 → MMS評価額(最新加重平均) でフォールバック（顧客2026）。
-      last_cost: (ordMap[sk]?.up && ordMap[sk]!.up! > 0) ? ordMap[sk]!.up : (sitWholesale ?? costMap[sk] ?? null),
+      // 前回原価（顧客要望2026）: 発注管理>発注書一覧で「発注先会社＝株式会社MONO-MART」を除いた
+      //   最新発注の単価から拾う（ordMapは既に自社除外済み・最新発注）。MMS発注単価が無ければ空欄
+      //   （sitateru/MMS評価額での補完は誤った原価表示になるため廃止。例: CLEsh855=発注実績なし→空欄）。
+      last_cost: (ordMap[sk]?.up && ordMap[sk]!.up! > 0) ? ordMap[sk]!.up : null,
       // 最新加重平均原価: MMS評価額(>0)優先 → 委託PF品番等で0/無い時はPF下代で補完（顧客2026・BLEsh1667）。
       latest_avg_cost: (costMap[sk] && costMap[sk]! > 0) ? costMap[sk] : (pfCost ?? null),
       // 最終入荷日: 倉庫在庫の入荷日(SKU別・№12除外)優先 → 在庫無し等で拾えない時はsitateru確定納品日で補完。
