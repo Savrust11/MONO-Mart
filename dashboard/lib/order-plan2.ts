@@ -99,7 +99,7 @@ export async function fetchPlan2(pc: string, start: string, end: string,
     { pc }))[0];
   if (canonRow?.p) pc = canonRow.p;
 
-  const [ordRows, uuRows, costRows, incRows, sitDelivRows, stkRows, cdaysRows, exclRows, pivRows, colorOrderRows] = await Promise.all([
+  const [ordRows, uuRows, costRows, incRows, sitDelivRows, stkRows, cdaysRows, exclRows, pivRows, colorOrderRows, skuMasterRows] = await Promise.all([
     // 日次 受注（販売数/売上/上代/予約販売数）
     q(`SELECT CAST(sale_date AS STRING) d, SUM(sales_quantity) qty, SUM(sales_amount) rev,
          SUM(proper_price*sales_quantity) lst, SUM(IF(sale_type LIKE '%予約%', sales_quantity, 0)) yqty
@@ -165,6 +165,9 @@ export async function fetchPlan2(pc: string, start: string, end: string,
                      FROM ${T('color_master')} GROUP BY cn)
        SELECT colr.cn, ROW_NUMBER() OVER (ORDER BY catord.cat_min, colr.cid) rank
        FROM colr JOIN catord ON catord.color_category=colr.cat`, {}),
+    // 全登録SKU（期間集計と行数を一致させる）: 商品マスタ起点で売上0のSKUも表示する。
+    q(`SELECT UPPER(TRIM(sku_code)) sk, ANY_VALUE(color_name) cn, ANY_VALUE(size) sz
+       FROM ${T('product_master')} WHERE UPPER(TRIM(product_code))=UPPER(TRIM(@pc)) GROUP BY sk`, { pc }),
   ]);
   const colorRank: Record<string, number> = {};
   for (const r of colorOrderRows) colorRank[String(r.cn)] = Number(r.rank);
@@ -233,7 +236,13 @@ export async function fetchPlan2(pc: string, start: string, end: string,
   }));
 
   // SKU × 日付 ピボット
+  //   期間集計と行数を一致させるため、まず商品マスタの全SKUで初期化（売上0でも行を作る）。
   const skuMap: Record<string, { cn: string | null; sz: string | null; byDay: Record<string, number> }> = {};
+  for (const r of skuMasterRows) {
+    const sk = r.sk as string;
+    skuMap[sk] = { cn: r.cn ?? null, sz: r.sz ?? null, byDay: {} };
+  }
+  // 販売実績を重ねる（マスタに無いSKUが受注に出た場合も拾う）。
   for (const r of pivRows) {
     const sk = r.sk as string;
     (skuMap[sk] ??= { cn: r.cn ?? null, sz: r.sz ?? null, byDay: {} }).byDay[dstr(r.d) ?? ''] = num(r.q);
