@@ -29,7 +29,8 @@ async function q(sql: string, params: Record<string, unknown>): Promise<any[]> {
 const num = (x: unknown): number => Number((x as any)?.value ?? x ?? 0) || 0;
 const r1 = (x: number) => Math.round(x * 10) / 10;
 // 顧客No.5 (2026-06-24 山口): 着荷が asof から N日より先の入荷予定は「将来の発注」と
-// みなし、フリー在庫に含めない（過大計上＝過小発注の防止）。着荷日なし・期日超過(過去日)は含める。
+// みなし、フリー在庫に含めない（過大計上＝過小発注の防止）。
+// 2026追加要望: 着荷予定が「未定(NULL/空欄)」のものも除外。期日超過(過去日)の実日付のみ算入。
 const FUTURE_ARRIVAL_CUTOFF_DAYS = 180;
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const dval = (x: any): string | null => (x == null ? null : (x.value ?? String(x)));
@@ -198,7 +199,11 @@ export async function fetchPlan1(pc: string, start: string, end: string,
        SELECT UPPER(TRIM(sku_code)) sk, SUM(quantity) q FROM ${T('reservations')}
        WHERE product_code=@pc AND reservation_date=(SELECT d FROM latest) GROUP BY sk`, { pc }),
     // 入荷残（最新 source_date）SKU別 → フリー在庫
-    // 顧客No.5: 着荷 > asof+N日 の入荷予定は将来発注扱いで除外（日付なし・期日超過は含める）
+    // 顧客No.5+2026: 着荷予定が「今日+N日」以内の実日付のものだけ算入。
+    //   ・今日+N日を超える(来シーズン等) → 除外
+    //   ・着荷予定が未定/NULL/空欄/不正 → 除外（顧客追加要望: 未定も除外）
+    //   ・期日超過(過去日)の実日付 → 引き続き算入（近く手元化する在庫）
+    //   SAFE_CASTが NULL の行は比較結果が NULL=非TRUE となり自動的に除外される。
     // incoming_stock.sku_code は「品番＋SKU」連結（例 BLEsh1667F10181pf）。商品マスタは「F10181pf」。
     // 先頭の品番接頭辞を除去してSKUに揃えてから集計（揃えないと入荷残がフリー在庫に乗らない不具合）。
     q(`WITH latest AS (SELECT MAX(source_date) d FROM ${T('incoming_stock')} WHERE product_code=@pc)
@@ -208,9 +213,8 @@ export async function fetchPlan1(pc: string, start: string, end: string,
                      ELSE sku_code END)) sk,
               SUM(incoming_qty) q FROM ${T('incoming_stock')}
        WHERE product_code=@pc AND source_date=(SELECT d FROM latest)
-         AND (earliest_arrival_date IS NULL
-              OR SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE)
-                 <= DATE_ADD(DATE(@asof), INTERVAL ${cutoffDays} DAY))
+         AND SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE)
+             <= DATE_ADD(DATE(@asof), INTERVAL ${cutoffDays} DAY)
        GROUP BY sk`, { pc, asof }),
     // 入荷残（SKU別×着荷日）。顧客指摘: 従来は品番合計を全SKUに同数表示していた→SKU別に修正。
     //   sku_code は「品番+SKU」連結なので接頭辞を除去。フリー在庫と整合するよう N日カットオフを適用。
