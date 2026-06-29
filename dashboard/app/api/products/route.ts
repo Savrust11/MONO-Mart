@@ -13,6 +13,9 @@ export async function GET(req: NextRequest) {
   const dateParam    = (searchParams.get('date') || 'latest').trim();
   const product_code = searchParams.get('product_code') || undefined;
   const urgency      = searchParams.get('urgency')      || undefined;
+  const shop            = searchParams.get('shop')            || undefined;  // 顧客要望2026: 絞り込み
+  const parent_category = searchParams.get('parent_category') || undefined;
+  const gender          = searchParams.get('gender')          || undefined;
   const limit        = Math.min(Number(searchParams.get('limit')  || 500), 1000);
   const offset       = Number(searchParams.get('offset') || 0);
 
@@ -36,10 +39,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await fetchOrderAnalysis({ date, product_code, urgency, limit, offset });
+    const result = await fetchOrderAnalysis({ date, product_code, urgency, shop, parent_category, gender, limit, offset });
     return NextResponse.json({
       data:  result.rows,
       total: result.total,
+      filters: result.filters,
       date,
       limit,
       offset,

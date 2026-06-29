@@ -19,6 +19,11 @@ export function OrderAnalysisView() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError]         = useState<string | null>(null);
   const [urgencyFilter, setUrgencyFilter] = useState<string>('');
+  // 顧客要望2026: ZOZOBO同様の絞り込み（ショップ／親カテゴリ／商品主性別）。サーバ側で適用。
+  const [shop, setShop] = useState<string>('');
+  const [parentCategory, setParentCategory] = useState<string>('');
+  const [gender, setGender] = useState<string>('');
+  const [opts, setOpts] = useState<{ shops: string[]; categories: string[]; genders: string[] }>({ shops: [], categories: [], genders: [] });
   const [simParams, setSimParams] = useState<SimParams>(DEFAULT_SIM_PARAMS);
   const [busy, setBusy] = useState(true);          // 初回ロード中は円形プログレスを表示
   const [loadedOnce, setLoadedOnce] = useState(false);
@@ -29,10 +34,14 @@ export function OrderAnalysisView() {
     try {
       const params = new URLSearchParams({ date: date || 'latest', limit: '1000' });
       if (urgencyFilter) params.append('urgency', urgencyFilter);
+      if (shop) params.append('shop', shop);
+      if (parentCategory) params.append('parent_category', parentCategory);
+      if (gender) params.append('gender', gender);
       const res = await fetch(`/api/products?${params}`);
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const json = await res.json();
       setRows(json.data || []);
+      if (json.filters) setOpts(json.filters);  // 絞り込みの選択肢（当日の対象に存在する値）
       if (!date && json.date) setDate(json.date);  // 最新日を日付入力に反映（顧客#15）
     } catch (err) {
       setError(String(err));
@@ -40,7 +49,7 @@ export function OrderAnalysisView() {
       setIsLoading(false);
       setLoadedOnce(true);
     }
-  }, [date, urgencyFilter]);
+  }, [date, urgencyFilter, shop, parentCategory, gender]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -106,6 +115,22 @@ export function OrderAnalysisView() {
             onChange={(e) => setDate(e.target.value)}
             className="px-2 py-1 text-xs border border-gray-300 rounded"
           />
+          {/* 顧客要望2026: ZOZOBO同様の絞り込み（ショップ／親カテゴリ／商品主性別） */}
+          <select value={shop} onChange={(e) => setShop(e.target.value)}
+            className="px-2 py-1 text-xs border border-gray-300 rounded max-w-[140px]">
+            <option value="">全ショップ</option>
+            {opts.shops.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={parentCategory} onChange={(e) => setParentCategory(e.target.value)}
+            className="px-2 py-1 text-xs border border-gray-300 rounded max-w-[140px]">
+            <option value="">全親カテゴリ</option>
+            {opts.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={gender} onChange={(e) => setGender(e.target.value)}
+            className="px-2 py-1 text-xs border border-gray-300 rounded">
+            <option value="">全性別</option>
+            {opts.genders.map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
           <select
             value={urgencyFilter}
             onChange={(e) => setUrgencyFilter(e.target.value)}
