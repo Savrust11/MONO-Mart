@@ -30,7 +30,9 @@ const num = (x: unknown): number => Number((x as any)?.value ?? x ?? 0) || 0;
 const r1 = (x: number) => Math.round(x * 10) / 10;
 // 顧客No.5 (2026-06-24 山口): 着荷が asof から N日より先の入荷予定は「将来の発注」と
 // みなし、フリー在庫に含めない（過大計上＝過小発注の防止）。
-// 2026追加要望: 着荷予定が「未定(NULL/空欄)」のものも除外。期日超過(過去日)の実日付のみ算入。
+// 2026追加要望: 入荷残は「今日 ≦ 着荷予定 ≦ 今日+N日」のみ算入。
+//   ・未定(NULL/空欄)は除外。
+//   ・過去日(入荷済)は除外（既に現在庫に計上済みで二重計上になるため）。
 const FUTURE_ARRIVAL_CUTOFF_DAYS = 180;
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const dval = (x: any): string | null => (x == null ? null : (x.value ?? String(x)));
@@ -199,10 +201,10 @@ export async function fetchPlan1(pc: string, start: string, end: string,
        SELECT UPPER(TRIM(sku_code)) sk, SUM(quantity) q FROM ${T('reservations')}
        WHERE product_code=@pc AND reservation_date=(SELECT d FROM latest) GROUP BY sk`, { pc }),
     // 入荷残（最新 source_date）SKU別 → フリー在庫
-    // 顧客No.5+2026: 着荷予定が「今日+N日」以内の実日付のものだけ算入。
+    // 顧客No.5+2026: 入荷残＝「今日 ≦ 着荷予定 ≦ 今日+N日」の実日付のものだけ算入。
+    //   ・着荷予定が過去日(入荷済) → 除外（顧客指摘2026: 入荷済は現在庫に入っており二重計上になる）
     //   ・今日+N日を超える(来シーズン等) → 除外
-    //   ・着荷予定が未定/NULL/空欄/不正 → 除外（顧客追加要望: 未定も除外）
-    //   ・期日超過(過去日)の実日付 → 引き続き算入（近く手元化する在庫）
+    //   ・着荷予定が未定/NULL/空欄/不正 → 除外
     //   SAFE_CASTが NULL の行は比較結果が NULL=非TRUE となり自動的に除外される。
     // incoming_stock.sku_code は「品番＋SKU」連結（例 BLEsh1667F10181pf）。商品マスタは「F10181pf」。
     // 先頭の品番接頭辞を除去してSKUに揃えてから集計（揃えないと入荷残がフリー在庫に乗らない不具合）。
@@ -214,10 +216,11 @@ export async function fetchPlan1(pc: string, start: string, end: string,
               SUM(incoming_qty) q FROM ${T('incoming_stock')}
        WHERE product_code=@pc AND source_date=(SELECT d FROM latest)
          AND SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE)
-             <= DATE_ADD(DATE(@asof), INTERVAL ${cutoffDays} DAY)
+             BETWEEN CURRENT_DATE('Asia/Tokyo') AND DATE_ADD(DATE(@asof), INTERVAL ${cutoffDays} DAY)
        GROUP BY sk`, { pc, asof }),
     // 入荷残（SKU別×着荷日）。顧客指摘: 従来は品番合計を全SKUに同数表示していた→SKU別に修正。
-    //   sku_code は「品番+SKU」連結なので接頭辞を除去。フリー在庫と整合するよう N日カットオフを適用。
+    //   sku_code は「品番+SKU」連結なので接頭辞を除去。フリー在庫と整合するよう「今日〜今日+N日」を適用
+    //   （過去日=入荷済は除外。推移集計の入荷数量は過去の入荷推移なので別物＝そちらは除外しない）。
     q(`SELECT UPPER(TRIM(
                 CASE WHEN STARTS_WITH(UPPER(TRIM(sku_code)), UPPER(TRIM(product_code)))
                      THEN SUBSTR(TRIM(sku_code), LENGTH(TRIM(product_code)) + 1)
@@ -226,7 +229,8 @@ export async function fetchPlan1(pc: string, start: string, end: string,
        FROM ${T('incoming_stock')} WHERE product_code=@pc AND earliest_arrival_date IS NOT NULL
          AND source_date=(SELECT MAX(source_date) FROM ${T('incoming_stock')} WHERE product_code=@pc)
        GROUP BY sk, d
-       HAVING d IS NOT NULL AND d <= DATE_ADD(DATE(@asof), INTERVAL ${cutoffDays} DAY)
+       HAVING d IS NOT NULL
+          AND d BETWEEN CURRENT_DATE('Asia/Tokyo') AND DATE_ADD(DATE(@asof), INTERVAL ${cutoffDays} DAY)
        ORDER BY sk, d`, { pc, asof }),
     // ヘッダ用 品番属性・レビュー・合計粗利率/値引率
     fetchHeader(pc, start, end, asof),
