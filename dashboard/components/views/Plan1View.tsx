@@ -240,11 +240,11 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
         <Field label="商品タイプ" value={`${h.item_type_parent ?? '—'} / ${h.item_type_child ?? '—'}`} />
         <Field label="集計期間" value={`${d(h.start)} 〜 ${d(h.end)}`} />
         <Field label="累計レビュー" value={`${n(h.review_count)}件 / ${h.review_avg ?? '—'}点`} />
-        <Field label={`合計粗利率${totalLabel}`} value={hdr.margin == null ? '—' : `${hdr.margin.toFixed(1)}%`}
+        <Field label={`集計期間合計粗利率${totalLabel}`} value={hdr.margin == null ? '—' : `${hdr.margin.toFixed(1)}%`}
           warn={hdr.margin != null && hdr.margin < 0} badge="原価割れ" />
-        <Field label={`合計値引率${totalLabel}`} value={hdr.discount == null ? '—' : `${hdr.discount.toFixed(1)}%`} />
-        <Field label={`合計販売額${totalLabel}`} value={n(hdr.rev, '円')} />
-        <Field label={`合計販売数${totalLabel}`} value={n(hdr.qty, '点')} />
+        <Field label={`集計期間合計値引率${totalLabel}`} value={hdr.discount == null ? '—' : `${hdr.discount.toFixed(1)}%`} />
+        <Field label={`集計期間合計販売額${totalLabel}`} value={n(hdr.rev, '円')} />
+        <Field label={`集計期間合計枚数${totalLabel}`} value={n(hdr.qty, '点')} />
       </div>
 
       {/* 商品画像（カラー別）R02 */}

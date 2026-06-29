@@ -496,11 +496,11 @@ export function plan1ToMatrix(p: Plan1, excludedColors?: Set<string>): (string |
     ['商品タイプ子', v(h.item_type_child)],
     ['累計レビュー件数', v(h.review_count)],
     ['累計レビュー点数', v(h.review_avg)],
-    ['合計粗利率', pctv(h.total_margin_pct)],
-    ['合計値引率', pctv(h.total_discount_pct)],
-    ['合計販売額', v(h.total_revenue)],
-    ['合計枚数', h.total_qty],
-    ['合計推奨発注数', totalRec],   // ← 合計枚数の下・画像の上（顧客要望）
+    ['集計期間合計粗利率', pctv(h.total_margin_pct)],
+    ['集計期間合計値引率', pctv(h.total_discount_pct)],
+    ['集計期間合計販売額', v(h.total_revenue)],   // 旧「合計上代額」→販売額に変更済み（顧客要望）
+    ['集計期間合計枚数', h.total_qty],
+    ['合計推奨発注数', totalRec],   // ← 集計期間合計枚数の下・画像の上（顧客要望）。発注推奨は期間集計値でないため接頭辞なし
   ];
   const m: (string | number)[][] = [...head];
 
