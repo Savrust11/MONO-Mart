@@ -171,11 +171,31 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
       .forEach(({ i }) => { if (residual-- > 0) floor[i] += 1; });
     return floor;
   };
+  const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
   const allocShort: Record<string, number> = {};   // 不足ベース
   const allocSales: Record<string, number> = {};   // 構成比ベース
+  // オフシーズン判定: 直近販売がほぼ無く、全SKUの推奨発注数が0（＝不足が出ず均等割りに落ちる）。
+  //   顧客指摘(BLEjk605): シーズン外で全色500均等になり在庫差が出ない。
+  //   → オフシーズンは「指定した実績期間」を基準にし、在庫も考慮する別ロジックに切替える。
+  let offSeason = false;
   if (totalQty > 0 && activeRows.length) {
-    const shortW = distribute(activeRows.map((s) => Math.max(s.recommended_qty || 0, 0)));
-    const salesW = distribute(activeRows.map((s) => Math.max(s.l30_qty || 0, 0)));
+    const recW = activeRows.map((s) => Math.max(s.recommended_qty || 0, 0));
+    // ── 不足ベースの重み ──
+    let shortWeights = recW;
+    if (sum(recW) === 0) {
+      offSeason = true;
+      // オフシーズン: 指定期間の実績 − フリー在庫 ＝「期間不足」（在庫が潤沢な色ほど小さく）
+      const periodShort = activeRows.map((s) => Math.max((s.sales_qty || 0) - (s.free_stock || 0), 0));
+      shortWeights = sum(periodShort) > 0
+        ? periodShort
+        : activeRows.map((s) => Math.max(s.sales_qty || 0, 0)); // それも全0なら指定期間の販売構成比
+    }
+    // ── 構成比ベースの重み（オフシーズンは直近30日が0なので指定期間実績を使う）──
+    const l30W = activeRows.map((s) => Math.max(s.l30_qty || 0, 0));
+    const salesWeights = sum(l30W) > 0 ? l30W : activeRows.map((s) => Math.max(s.sales_qty || 0, 0));
+
+    const shortW = distribute(shortWeights);
+    const salesW = distribute(salesWeights);
     activeRows.forEach((s, i) => {
       allocShort[s.sku_code ?? ''] = shortW[i];
       allocSales[s.sku_code ?? ''] = salesW[i];
@@ -317,8 +337,13 @@ export function Plan1View({ code, start, end, totalQty = 0, cutoffN = 180,
               <Th>お気に入り</Th><Th>販売数</Th><Th>FKU構成</Th><Th>前回発注日</Th><Th>前回原価</Th>
               <Th>最新加重平均原価</Th><Th>最終入荷日</Th><Th>現在庫数</Th>
               <Th cls="bg-indigo-50">推奨発注数</Th><Th cls="bg-indigo-50">確定発注数</Th>
-              {totalQty > 0 && <Th cls="bg-indigo-100" title="総数を各SKUの不足(需要−残在庫)の比率で配分。在庫が充足な色は小さくなる">配分数（不足ベース）</Th>}
-              {totalQty > 0 && <Th cls="bg-purple-100" title="総数を直近30日の販売構成比で配分（人気度ベース）">配分数（構成比）</Th>}
+              {totalQty > 0 && <Th cls="bg-indigo-100" title={offSeason
+                ? 'オフシーズン: 直近実績が無いため、指定した実績期間の販売−フリー在庫（在庫考慮）で配分'
+                : '総数を各SKUの不足(需要−残在庫)の比率で配分。在庫が充足な色は小さくなる'}>
+                配分数（不足ベース）{offSeason && <span className="ml-0.5 text-[9px] text-amber-700">▲季</span>}</Th>}
+              {totalQty > 0 && <Th cls="bg-purple-100" title={offSeason
+                ? 'オフシーズン: 直近30日が無いため、指定した実績期間の販売構成比で配分'
+                : '総数を直近30日の販売構成比で配分（人気度ベース）'}>配分数（構成比）</Th>}
               <Th cls="bg-sky-50">7日販売数</Th><Th cls="bg-sky-50">日販平均</Th><Th cls="bg-sky-50">在庫日数</Th><Th cls="bg-sky-50">完売想定日</Th>
               <Th cls="bg-teal-50">30日販売数</Th><Th cls="bg-teal-50">日販中央値</Th><Th cls="bg-teal-50">在庫日数</Th><Th cls="bg-teal-50">完売想定日</Th>
               <Th cls="bg-violet-50">フリー在庫数</Th><Th cls="bg-violet-50">フリー在庫日数</Th><Th cls="bg-violet-50">予約未処理</Th>
