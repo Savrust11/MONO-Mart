@@ -34,6 +34,12 @@ echo "----- [1b] zozoad fetch -----"
 TARGET_DATE="$TARGET" timeout 900 python pipeline/scrapers/fetch_zozoad_report.py || true
 echo "[1b] zozoad exit=$?"
 
+# 1c) Googleシート（発注明細→入荷残・PF手数料・買い回り）。SAキーで取得→GCS。
+#     これが未実行だと入荷残(incoming_stock)が更新されず古いまま固定される不具合があったため日次化。
+echo "----- [1c] sheets fetch (発注明細/PF) -----"
+TARGET_DATE="$TARGET" timeout 600 python pipeline/scrapers/fetch_sheets.py || true
+echo "[1c] sheets exit=$?"
+
 # 2) ETL ingest (GCS -> BigQuery analytics layer; idempotent DELETE+INSERT by date)
 echo "----- [2] ingest -----"
 timeout 1200 python pipeline/main.py --csv-ingest --date "$TARGET"
