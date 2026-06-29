@@ -182,10 +182,14 @@ export async function fetchPlan1(pc: string, start: string, end: string,
        WHERE product_code=@pc AND delivery_note_no IS NOT NULL AND delivery_note_no!=''
          AND NOT STARTS_WITH(delivery_note_no,'_') AND NOT REGEXP_CONTAINS(delivery_note_no,'-SAI-')
        GROUP BY sk`, { pc }),
-    // 前回発注日・前回原価（MMS発注書一覧, 作成日以前の最新）SKU別
+    // 前回発注日・前回原価（MMS発注書一覧＝発注管理>発注書一覧, 作成日以前の最新）SKU別
+    //   顧客要望2026: 発注先会社＝株式会社MONO-MART（自社からの再納品等イレギュラー）は除外。
+    //   全角/半角スペースを除去して「株式会社MONO-MART」と一致するレコードを外す（例 FOcd919）。
     q(`WITH r AS (SELECT UPPER(TRIM(sku_code)) sk, order_date od, unit_price up,
                     ROW_NUMBER() OVER (PARTITION BY UPPER(TRIM(sku_code)) ORDER BY order_date DESC) rn
-                  FROM ${T('mms_orders')} WHERE product_code=@pc AND order_date<=DATE(@asof))
+                  FROM ${T('mms_orders')}
+                  WHERE product_code=@pc AND order_date<=DATE(@asof)
+                    AND COALESCE(REGEXP_REPLACE(supplier_company, r'[[:space:]　]', ''), '') != '株式会社MONO-MART')
        SELECT sk, CAST(od AS STRING) od, up FROM r WHERE rn=1`, { pc, asof }),
     // 最新加重平均原価（MMS評価額一覧 最新評価額）SKU別
     q(`WITH r AS (SELECT UPPER(TRIM(sku_code)) sk, valuation_price vp,

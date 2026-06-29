@@ -129,6 +129,9 @@ def main() -> int:
             "order_qty": int(n(r.get("発注数量")) or 0),
             "unit_price": n(r.get("単価")),
             "order_no": (r.get("発注書No") or "").strip(),
+            # 顧客要望2026: 発注先会社。自社(株式会社MONO-MART)の再納品等イレギュラーを
+            #   前回発注日/前回原価の集計から除外するために使う。
+            "supplier_company": (r.get("発注先会社") or "").strip(),
             "snapshot_date": TODAY,
         })
     if not recs:
@@ -146,6 +149,7 @@ def main() -> int:
         bigquery.SchemaField("order_qty", "INTEGER"),
         bigquery.SchemaField("unit_price", "NUMERIC"),
         bigquery.SchemaField("order_no", "STRING"),
+        bigquery.SchemaField("supplier_company", "STRING"),
         bigquery.SchemaField("snapshot_date", "DATE"),
     ]
     bq.load_table_from_json(recs, table,
