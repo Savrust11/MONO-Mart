@@ -40,6 +40,31 @@ export function RepeatOrderForm() {
   const [emphasisMode, setEmphasisMode] = useState<'normal'|'top1'>('normal');
   const [addNewColor, setAddNewColor] = useState(false);
   const [memo, setMemo] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [outMsg, setOutMsg] = useState<string | null>(null);
+  const [outUrl, setOutUrl] = useState<string | null>(null);
+
+  // 「作成」: 入力品番で BigQuery 実データから発注管理表スプレッドシートを生成（稼働中の統合出力を利用）。
+  //   参照実績期間＝直近90日（V2のカラー構成比の参照期間）。total/対象カラーは期間集計側の配分に反映。
+  const create = async () => {
+    const pc = productCode.trim();
+    if (!pc) { setOutMsg('ブランド品番を入力してください。'); return; }
+    setBusy(true); setOutMsg('BigQueryから集計してスプレッドシートを作成中…'); setOutUrl(null);
+    try {
+      const jst = new Date(Date.now() + 9 * 3600 * 1000);
+      const end = jst.toISOString().slice(0, 10);
+      const start = new Date(jst.getTime() - 89 * 86400000).toISOString().slice(0, 10);
+      const res = await fetch(
+        `/api/order-plan/to-sheet?product_code=${encodeURIComponent(pc)}&start=${start}&end=${end}`,
+        { method: 'POST' });
+      const j = await res.json();
+      if (res.ok) {
+        setOutMsg(`✓ 発注管理表を作成しました（${j.rows}行・参照期間 ${start}〜${end}）`);
+        setOutUrl(j.url || null);
+      } else setOutMsg(`エラー: ${j.error || '作成に失敗しました'}`);
+    } catch (e) { setOutMsg('通信エラー: ' + String(e)); }
+    finally { setBusy(false); }
+  };
 
   return (
     <div className="px-6 py-4">
@@ -196,11 +221,18 @@ export function RepeatOrderForm() {
             </div>
           </section>
 
-          {/* Submit button */}
-          <button className="inline-flex items-center gap-2 px-6 py-3 bg-rose-300 text-white font-bold rounded hover:bg-rose-400 transition">
+          {/* Submit button（BigQuery実データ連携） */}
+          <button onClick={create} disabled={busy || !productCode.trim()}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-rose-400 text-white font-bold rounded hover:bg-rose-500 transition disabled:opacity-50">
             <FileSpreadsheet className="w-4 h-4" />
-            スプレッドシートを作成
+            {busy ? '作成中…' : 'スプレッドシートを作成'}
           </button>
+          {outMsg && (
+            <div className="text-sm mt-1">
+              <span className={outMsg.startsWith('✓') ? 'text-emerald-700' : outMsg.startsWith('エラー') || outMsg.startsWith('通信') ? 'text-rose-600' : 'text-gray-500'}>{outMsg}</span>
+              {outUrl && <a href={outUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-teal-700 underline font-medium">📊 スプレッドシートを開く</a>}
+            </div>
+          )}
         </div>
 
         {/* Right sidebar: 使い方 + ロジック + シート */}
