@@ -123,10 +123,14 @@ export async function fetchPlan2(pc: string, start: string, end: string,
        SELECT s.d, SUM(s.qty*COALESCE((SELECT val FROM pfc), c.vp, 0)) cost FROM s LEFT JOIN c ON c.sk=s.sk GROUP BY s.d`,
       { pc, sd: fetchStart, ed: end, ...(exNorm.length ? { excl: exNorm } : {}) }),
     // 入荷数量（着日別・最新スナップショット）。incoming_stockは未入荷(将来)中心。
+    //   集計不要SKUは入荷数量からも除外（顧客2026: 推移集計も除外連動）。
+    //   incoming_stock.sku_code は「品番+SKU」連結なので、接頭辞を除去してから@exclと突合。
     q(`SELECT CAST(SAFE_CAST(REPLACE(earliest_arrival_date,'/','-') AS DATE) AS STRING) d, SUM(incoming_qty) q
        FROM ${T('incoming_stock')} WHERE product_code=@pc AND earliest_arrival_date IS NOT NULL
          AND source_date=(SELECT MAX(source_date) FROM ${T('incoming_stock')} WHERE product_code=@pc)
-       GROUP BY d HAVING d IS NOT NULL`, { pc }),
+         ${exNorm.length ? `AND UPPER(TRIM(CASE WHEN STARTS_WITH(UPPER(TRIM(sku_code)), UPPER(TRIM(product_code)))
+              THEN SUBSTR(TRIM(sku_code), LENGTH(TRIM(product_code))+1) ELSE sku_code END)) NOT IN UNNEST(@excl)` : ''}
+       GROUP BY d HAVING d IS NOT NULL`, { pc, ...(exNorm.length ? { excl: exNorm } : {}) }),
     // sitateru 確定納品（過去の実入荷）— incoming_stockに無い過去入荷を補完（顧客2026・FOcd919 3月入荷）。
     //   sitateruは複数スナップショット行があるため、item_id毎に最新スナップショットだけ採用して二重計上を防ぐ。
     q(`WITH latest AS (
@@ -136,10 +140,10 @@ export async function fetchPlan2(pc: string, start: string, end: string,
            AND confirmed_delivery_date IS NOT NULL AND actual_delivery_qty>0)
        SELECT CAST(SAFE_CAST(REPLACE(confirmed_delivery_date,'/','-') AS DATE) AS STRING) d, SUM(actual_delivery_qty) q
        FROM latest WHERE rn=1 GROUP BY d HAVING d IS NOT NULL`, { pc }),
-    // 在庫（当時・日次スナップショット）
+    // 在庫（当時・日次スナップショット）。集計不要SKUは在庫からも除外（推移集計も除外連動）。
     q(`SELECT CAST(snapshot_date AS STRING) d, SUM(available_qty) s FROM ${T('stock_analysis')}
-       WHERE product_code=@pc AND snapshot_date BETWEEN DATE(@sd) AND DATE(@ed) GROUP BY d`,
-      { pc, sd: fetchStart, ed: end }),
+       WHERE product_code=@pc AND snapshot_date BETWEEN DATE(@sd) AND DATE(@ed) ${exclSql} GROUP BY d`,
+      { pc, sd: fetchStart, ed: end, ...(exNorm.length ? { excl: exNorm } : {}) }),
     // クーポン実施日（ショップ単位）。brand_name(クーポンCSVのファイル名由来) と
     // product_master.shop_name は表記ゆれ(大小・空白)があり得るため UPPER(TRIM()) で正規化して突合。
     q(`SELECT DISTINCT CAST(exclusion_date AS STRING) d FROM ${T('coupon_exclusion')}
