@@ -7,6 +7,7 @@ import { BarChart3, Package, ShoppingCart, FileSpreadsheet, Repeat, TrendingUp }
 import { RepeatOrderForm } from '@/components/views/RepeatOrderForm';
 import { OrderAnalysisView } from '@/components/views/OrderAnalysisView';
 import { MdPlanView } from '@/components/views/MdPlanView';
+import { CategoryTrendView } from '@/components/views/CategoryTrendView';
 
 function AnalyticsContent() {
   const search = useSearchParams();
@@ -18,6 +19,8 @@ function AnalyticsContent() {
       return <RepeatOrderForm />;
     case 'md-plan':
       return <MdPlanView />;
+    case 'category-trend':
+      return <CategoryTrendView />;
     case 'order-recommend':
       return <OrderAnalysisView />;
     case 'cross-buy':

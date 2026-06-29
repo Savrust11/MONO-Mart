@@ -43,6 +43,7 @@ const ANALYTICS_TREE: TreeItem[] = [
       { label: '発注推奨データ',          href: '/dashboard/analytics?view=order-recommend' },
       { label: 'リピート発注表作成',      href: '/dashboard/analytics?view=repeat-order' },
       { label: '52週 季節係数',           href: '/dashboard/seasonal' },
+      { label: 'カテゴリ別52週トレンド',   href: '/dashboard/analytics?view=category-trend' },
     ],
   },
   {
