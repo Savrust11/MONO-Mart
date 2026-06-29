@@ -97,7 +97,8 @@ export function buildPlan1Format(sheetId: number, values: (string | number)[][])
         fields: 'userEnteredFormat.numberFormat',
       },
     });
-    reqs.push(hdrFmt(13, '0.0%', 'PERCENT'), hdrFmt(14, '0.0%', 'PERCENT'), hdrFmt(15, '#,##0"円"'), hdrFmt(16, '#,##0'));
+    reqs.push(hdrFmt(13, '0.0%', 'PERCENT'), hdrFmt(14, '0.0%', 'PERCENT'), hdrFmt(15, '#,##0"円"'),
+      hdrFmt(16, '#,##0'), hdrFmt(17, '#,##0"枚"'));  // 17=合計推奨発注数（顧客要望で追加）
   }
   return reqs;
 }

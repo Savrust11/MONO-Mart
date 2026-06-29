@@ -474,6 +474,9 @@ export function plan1ToMatrix(p: Plan1, excludedColors?: Set<string>): (string |
   const v = (x: unknown): string | number => (x == null ? '' : (x as string | number));
   const pctv = (x: number | null | undefined) => (x == null ? '' : `${x}%`);
   const fkuv = (x: number | null | undefined) => (x == null ? '' : `${Math.round(x * 100)}%`);
+  // 顧客要望2026: 推奨発注数の合計枚数を追加（合計枚数の下・画像の上）。
+  //   p.skus は集計対象SKU（除外済み）なので、ここで合計すれば集計対象外は自動で除かれる。
+  const totalRec = p.skus.reduce((a, s) => a + (typeof s.recommended_qty === 'number' ? s.recommended_qty : 0), 0);
   // ── ① ヘッダ（label/value 縦並び：左ブロック）──
   const head: (string | number)[][] = [
     ['発注管理表 期間集計'],
@@ -493,6 +496,7 @@ export function plan1ToMatrix(p: Plan1, excludedColors?: Set<string>): (string |
     ['合計値引率', pctv(h.total_discount_pct)],
     ['合計販売額', v(h.total_revenue)],
     ['合計枚数', h.total_qty],
+    ['合計推奨発注数', totalRec],   // ← 合計枚数の下・画像の上（顧客要望）
   ];
   const m: (string | number)[][] = [...head];
 
@@ -501,19 +505,16 @@ export function plan1ToMatrix(p: Plan1, excludedColors?: Set<string>): (string |
   //   高くなってしまう。ダッシュボードのように「画像だけの行」にして、ヘッダ行の高さに影響させない。
   //   集計対象外カラーは別セクション「集計対象外（参考）」に分け、名前に印を付ける（書式で赤＋取消線＋赤枠）。
   //   インライン表示は =IMAGE が唯一の手段（初回「アクセスを許可」が必要・Google仕様）。
-  const PER_ROW = 5;
+  // 顧客要望2026: 対象カラーは1行、対象外は1行（折返しなし）。各セクション＝画像1行＋カラー名1行。
   const pushImageBands = (imgs: Plan1Image[], mark: boolean) => {
-    for (let band = 0; band * PER_ROW < imgs.length; band++) {
-      const imgRow: (string | number)[] = [];
-      const nameRow: (string | number)[] = [];
-      for (let k = 0; k < PER_ROW; k++) {
-        const im = imgs[band * PER_ROW + k];
-        imgRow[k] = im ? `=IMAGE("${im.url}")` : '';
-        nameRow[k] = im ? (mark ? `${im.color}${PLAN1_EXCLUDED_MARK}` : im.color) : '';
-      }
-      m.push(imgRow);                            // 画像だけの行（=IMAGE）
-      m.push(nameRow);                           // カラー名の行（画像の下）
-    }
+    const imgRow: (string | number)[] = [];
+    const nameRow: (string | number)[] = [];
+    imgs.forEach((im, k) => {
+      imgRow[k] = `=IMAGE("${im.url}")`;
+      nameRow[k] = mark ? `${im.color}${PLAN1_EXCLUDED_MARK}` : im.color;
+    });
+    m.push(imgRow);                             // 全カラーを1行に（画像だけの行）
+    m.push(nameRow);                            // カラー名の行（画像の下）
   };
   const activeImgs = excludedColors ? p.images.filter((im) => !excludedColors.has(im.color)) : p.images;
   const excludedImgs = excludedColors ? p.images.filter((im) => excludedColors.has(im.color)) : [];
