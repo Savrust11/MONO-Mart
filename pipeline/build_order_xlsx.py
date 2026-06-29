@@ -76,11 +76,15 @@ mms AS (
 -- MMS発注実績のある品番の「商品マスタ全SKU」。過去に発注した商品を母集合に足すための種。
 --   MMSのsku_codeを直接使わない理由: 発注書には sku_code 空欄の行があり(=品番単位の発注)、
 --   そのまま使うと色・名称が空の幽霊行になる。商品マスタ経由なら色名が必ず付き、空欄も排除できる。
+--   顧客要望2026: 発注先会社=株式会社MONO-MART(自社からの再納品等イレギュラー)は発注実績と
+--   みなさず除外。自社発注しか無い品番はMMS経由では母集合に足さない（在庫・直近受注があれば別途拾う）。
 mord AS (
   SELECT DISTINCT UPPER(TRIM(pm.product_code)) pc, UPPER(TRIM(pm.sku_code)) sk
   FROM `{A}.product_master` pm
   WHERE UPPER(TRIM(pm.product_code)) IN (
-    SELECT UPPER(TRIM(product_code)) FROM `{A}.mms_orders` WHERE TRIM(IFNULL(product_code,''))!='')),
+    SELECT UPPER(TRIM(product_code)) FROM `{A}.mms_orders`
+    WHERE TRIM(IFNULL(product_code,''))!=''
+      AND COALESCE(REGEXP_REPLACE(supplier_company, r'[[:space:]　]',''), '') != '株式会社MONO-MART')),
 universe AS (
   -- 顧客要件: 倉庫在庫を起点にすると売り切れ(在庫0)の商品が母集合から漏れる。
   --   そこで「MMSで発注実績のある品番」の商品マスタ全SKU(mord)を足し、過去に発注した
