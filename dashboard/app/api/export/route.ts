@@ -5,7 +5,7 @@
  * GET  /api/export — streams a direct download (for small datasets).
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchOrderAnalysis } from '@/lib/bigquery';
+import { fetchOrderAnalysis, fetchLatestAnalysisDate } from '@/lib/bigquery';
 import { todayJST } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -61,7 +61,14 @@ export async function POST(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const date = searchParams.get('date') || todayJST();
+  const dateParam = (searchParams.get('date') || 'latest').trim();
+  // date=latest（既定）→ マート最新日を採用（/api/products と整合）。
+  const date = dateParam === 'latest' ? ((await fetchLatestAnalysisDate()) || todayJST()) : dateParam;
+  // 顧客要望2026: 画面の絞り込み（ステータス/ショップ/親カテゴリ/性別）をCSVにも反映。
+  const urgency         = searchParams.get('urgency')         || undefined;
+  const shop            = searchParams.get('shop')            || undefined;
+  const parent_category = searchParams.get('parent_category') || undefined;
+  const gender          = searchParams.get('gender')          || undefined;
 
   if (MOCK_URL) {
     const resp = await fetch(`${MOCK_URL}/api/export`);
@@ -75,7 +82,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { rows } = await fetchOrderAnalysis({ date, limit: 10000 });
+    const { rows } = await fetchOrderAnalysis({ date, urgency, shop, parent_category, gender, limit: 10000 });
 
     const headers = [
       'メーカーカラー名', '品番', '商品名', 'カラー', 'サイズ', 'CS品番',

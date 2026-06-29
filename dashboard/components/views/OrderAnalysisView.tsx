@@ -98,6 +98,16 @@ export function OrderAnalysisView() {
     </div>
   );
 
+  // 顧客要望2026: ダウンロードも画面の絞り込みを保持。フィルタ有無でExcelの出力先を切替。
+  const filterQs = [
+    `date=${encodeURIComponent(date)}`,
+    urgencyFilter && `urgency=${encodeURIComponent(urgencyFilter)}`,
+    shop && `shop=${encodeURIComponent(shop)}`,
+    parentCategory && `parent_category=${encodeURIComponent(parentCategory)}`,
+    gender && `gender=${encodeURIComponent(gender)}`,
+  ].filter(Boolean).join('&');
+  const hasFilter = !!(urgencyFilter || shop || parentCategory || gender);
+
   return (
     <div className="px-6 py-4">
       {/* Title + filters */}
@@ -151,17 +161,20 @@ export function OrderAnalysisView() {
             更新
           </button>
           <a
-            href={`/api/export?date=${date}`}
+            href={`/api/export?${filterQs}`}
             className="inline-flex items-center gap-1 px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+            title="画面の絞り込みを反映したCSVをダウンロード"
           >
-            <Download className="w-3 h-3" /> CSV
+            <Download className="w-3 h-3" /> CSV{hasFilter && '（絞込）'}
           </a>
           <a
-            href="/api/order-xlsx"
+            href={hasFilter ? `/api/order-xlsx-filtered?${filterQs}` : '/api/order-xlsx'}
             className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700"
-            title="毎朝07:00 JSTに最新データで再生成された発注管理表.xlsx (経営者サマリ+23列詳細+緊急度別の3シート)。SA認証で非公開GCSから配信"
+            title={hasFilter
+              ? '画面の絞り込みを反映したExcel(.xlsx)を生成してダウンロード'
+              : '毎朝07:00 JSTに最新データで再生成された発注管理表.xlsx (経営者サマリ+23列詳細+緊急度別の3シート)。SA認証で非公開GCSから配信'}
           >
-            <FileSpreadsheet className="w-3 h-3" /> Excel
+            <FileSpreadsheet className="w-3 h-3" /> Excel{hasFilter && '（絞込）'}
           </a>
         </div>
       </div>
